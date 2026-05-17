@@ -1,0 +1,15 @@
+# aido configuration. Mounted read-only into the container at /app/config.yaml.
+
+archive_root: /archive
+scan_inbox: /scans
+db_path: /data/aido.sqlite
+log_path: /var/log/aido/aido.log
+
+classifier:
+  backend: agent_sdk                  # agent_sdk | anthropic_api | local_llm | fake
+  model: claude-opus-4-7
+  review_confidence_threshold: 0.75
+
+web:
+  bind: 0.0.0.0                       # bound inside the container; Docker maps to host
+  port: 8765
