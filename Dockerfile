@@ -7,6 +7,10 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
         curl \
         nodejs \
         npm \
+        tesseract-ocr \
+        tesseract-ocr-deu \
+        tesseract-ocr-eng \
+        poppler-utils \
     && rm -rf /var/lib/apt/lists/*
 
 # Create unprivileged runtime user (matches macOS UID 501 by default).

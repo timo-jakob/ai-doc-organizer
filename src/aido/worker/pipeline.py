@@ -17,6 +17,7 @@ from aido.classifier.routing import RouteDecision, route
 from aido.filing.executor import FilingTarget, file_document
 from aido.mutations import MutationContext
 from aido.pdf.extract import ExtractStatus, extract_text
+from aido.pdf.ocr import OcrStatus, ocr_text
 from aido.pdf.hash import sha256_of_file
 from aido.store.decisions import NewDecision, find_by_source_hash, insert_decision
 from aido.store.persons import get_person_by_slug
@@ -78,6 +79,15 @@ class Pipeline:
             return PipelineOutcome.DUPLICATE_SKIP
 
         text, status = extract_text(src)
+        if status is ExtractStatus.NO_TEXT:
+            ocr_t, ocr_status = ocr_text(src)
+            if ocr_status is OcrStatus.OK:
+                text = ocr_t
+                status = ExtractStatus.OK
+                _log.info(
+                    "pipeline.ocr_fallback_used",
+                    extra={"source_path": str(src), "chars": len(text)},
+                )
         if status is not ExtractStatus.OK:
             return self._route_to_review_no_classify(
                 src,
