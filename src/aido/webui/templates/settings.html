@@ -1,0 +1,96 @@
+{% extends "base.html" %}
+{% block body %}
+<h2>Settings</h2>
+
+<section>
+  <h3>Persons</h3>
+  <table>
+    <tr><th>Slug</th><th>Display</th><th>Shared?</th><th>Aliases</th></tr>
+    {% for p in persons %}
+      <tr>
+        <td>{{ p.slug }}</td>
+        <td>{{ p.display_name }}</td>
+        <td>{{ "yes" if p.is_shared else "no" }}</td>
+        <td>{{ aliases_by_person[p.id] | map(attribute='alias') | join(', ') }}</td>
+      </tr>
+    {% endfor %}
+  </table>
+  <details>
+    <summary>Add person</summary>
+    <form id="add-person">
+      <label>Slug <input name="slug"></label>
+      <label>Display name <input name="display_name"></label>
+      <label>Aliases (comma-separated) <input name="aliases"></label>
+      <label><input type="checkbox" name="is_shared"> shared bucket</label>
+      <button type="button" id="add-person-btn">Add</button>
+    </form>
+  </details>
+</section>
+
+<section>
+  <h3>Categories</h3>
+  <table>
+    <tr><th>Slug</th><th>Display</th><th>Description</th><th>Review?</th></tr>
+    {% for c in categories %}
+      <tr>
+        <td>{{ c.slug }}</td><td>{{ c.display_name }}</td>
+        <td>{{ c.description or "" }}</td>
+        <td>{{ "yes" if c.is_review else "" }}</td>
+      </tr>
+    {% endfor %}
+  </table>
+  <details>
+    <summary>Add category</summary>
+    <form id="add-category">
+      <label>Slug <input name="slug"></label>
+      <label>Display <input name="display_name"></label>
+      <label>Description <input name="description"></label>
+      <button type="button" id="add-category-btn">Add</button>
+    </form>
+  </details>
+</section>
+
+<section>
+  <h3>Doctypes</h3>
+  <table>
+    <tr><th>Slug</th><th>Display</th><th>Description</th></tr>
+    {% for d in doctypes %}
+      <tr><td>{{ d.slug }}</td><td>{{ d.display_name }}</td><td>{{ d.description or "" }}</td></tr>
+    {% endfor %}
+  </table>
+  <details>
+    <summary>Add doctype</summary>
+    <form id="add-doctype">
+      <label>Slug <input name="slug"></label>
+      <label>Display <input name="display_name"></label>
+      <label>Description <input name="description"></label>
+      <button type="button" id="add-doctype-btn">Add</button>
+    </form>
+  </details>
+</section>
+
+<script>
+(function () {
+  function values(form) {
+    const fd = new FormData(form);
+    const out = {};
+    for (const [k, v] of fd.entries()) out[k] = v;
+    if ("aliases" in out) out.aliases = out.aliases.split(",").map(s => s.trim()).filter(Boolean);
+    if ("is_shared" in out) out.is_shared = true; else out.is_shared = false;
+    return out;
+  }
+  document.getElementById("add-person-btn").onclick = async () => {
+    await aido.postJSON("/settings/persons", values(document.getElementById("add-person")));
+    location.reload();
+  };
+  document.getElementById("add-category-btn").onclick = async () => {
+    await aido.postJSON("/settings/categories", values(document.getElementById("add-category")));
+    location.reload();
+  };
+  document.getElementById("add-doctype-btn").onclick = async () => {
+    await aido.postJSON("/settings/doctypes", values(document.getElementById("add-doctype")));
+    location.reload();
+  };
+})();
+</script>
+{% endblock %}

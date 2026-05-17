@@ -1,0 +1,38 @@
+{% extends "base.html" %}
+{% block body %}
+<h2>{{ title }}</h2>
+{% if decisions|length == 0 %}
+  <p class="muted">Nothing here yet.</p>
+{% else %}
+<table class="feed">
+  <thead>
+    <tr>
+      <th>When</th>
+      <th>Filename</th>
+      <th>Person</th>
+      <th>Category</th>
+      <th>Confidence</th>
+      <th></th>
+    </tr>
+  </thead>
+  <tbody>
+  {% for row in decisions %}
+    <tr class="{{ 'needs-review' if row.decision.needs_review else '' }}">
+      <td>{{ row.decision.created_at.isoformat(sep=' ', timespec='minutes') }}</td>
+      <td><code>{{ row.decision.proposed_filename }}</code></td>
+      <td>{{ row.person_slug }}</td>
+      <td>{{ row.category_slug }}</td>
+      <td>
+        {% if row.decision.needs_review %}
+          <span class="conf rev">REVIEW {{ '%.2f' % row.decision.overall_confidence }}</span>
+        {% else %}
+          <span class="conf hi">{{ '%.2f' % row.decision.overall_confidence }}</span>
+        {% endif %}
+      </td>
+      <td><a href="/decisions/{{ row.decision.id }}">open</a></td>
+    </tr>
+  {% endfor %}
+  </tbody>
+</table>
+{% endif %}
+{% endblock %}

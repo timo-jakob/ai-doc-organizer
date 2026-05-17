@@ -1,0 +1,45 @@
+[project]
+name = "aido"
+version = "0.1.0"
+description = "Household document auto-filer for Claude"
+requires-python = ">=3.13"
+dependencies = [
+    "claude-agent-sdk>=0.1.0",
+    "anthropic>=0.40.0",
+    "pypdf>=4.0.0",
+    "watchdog>=4.0.0",
+    "flask>=3.0.0",
+    "jinja2>=3.1.0",
+    "ruamel.yaml>=0.18.0",
+    "pytesseract>=0.3.10",
+    "pdf2image>=1.17.0",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=8.0.0",
+    "pytest-mock>=3.12.0",
+    "fpdf2>=2.7.0",
+]
+
+[project.scripts]
+aido = "aido.cli:main"
+
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.setuptools.package-data]
+aido = [
+    "store/schema.sql",
+    "webui/templates/*.html",
+    "webui/static/*.js",
+    "webui/static/*.css",
+]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-ra --strict-markers"

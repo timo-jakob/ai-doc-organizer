@@ -1,0 +1,21 @@
+services:
+  aido:
+    build:
+      context: .
+      args:
+        UID: ${AIDO_UID:-501}
+        GID: ${AIDO_GID:-20}
+    image: aido:latest
+    container_name: aido
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:8765:8765"
+    volumes:
+      - ./config.yaml:/app/config.yaml:ro
+      - ./data:/data
+      - ./logs:/var/log/aido
+      - "${HOME}/Scans/incoming:/scans:rw"
+      - "${HOME}/Documents/Archive:/archive:rw"
+    environment:
+      - ANTHROPIC_API_KEY            # auto-substituted from project .env (if present)
+      - TZ=Europe/Berlin
