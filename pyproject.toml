@@ -31,7 +31,12 @@ build-backend = "setuptools.build_meta"
 where = ["src"]
 
 [tool.setuptools.package-data]
-aido = ["store/schema.sql"]
+aido = [
+    "store/schema.sql",
+    "webui/templates/*.html",
+    "webui/static/*.js",
+    "webui/static/*.css",
+]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
