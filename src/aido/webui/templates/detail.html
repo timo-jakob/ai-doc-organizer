@@ -1,0 +1,86 @@
+{% extends "base.html" %}
+{% block body %}
+<div class="detail">
+  <div class="preview">
+    <iframe src="{{ url_for('feed.pdf', decision_id=decision.id) }}"
+            title="PDF preview"></iframe>
+    <p class="muted">
+      Filename: <code>{{ decision.proposed_filename }}</code><br>
+      Current path: <code>{{ decision.filed_path }}</code><br>
+      Source: <code>{{ decision.source_path }}</code><br>
+      Confidence: {{ '%.2f' % decision.overall_confidence }}
+      (person {{ '%.2f' % decision.person_confidence }},
+       category {{ '%.2f' % decision.category_confidence }})
+    </p>
+  </div>
+  <div class="actions">
+    <h3>Classifier reasoning</h3>
+    <p class="reasoning">{{ decision.reasoning or "(none)" }}</p>
+    {% if decision.new_category_proposal %}
+      <p class="proposal">Proposed new category: <code>{{ decision.new_category_proposal }}</code></p>
+    {% endif %}
+
+    <h3>Re-file</h3>
+    <form id="refile-form" data-decision-id="{{ decision.id }}">
+      <label>Person
+        <select name="person_slug">
+          {% for p in all_persons %}
+            <option value="{{ p.slug }}" {% if p.slug == person_slug %}selected{% endif %}>
+              {{ p.slug }} — {{ p.display_name }}
+            </option>
+          {% endfor %}
+        </select>
+      </label>
+      <label>Category
+        <select name="category_slug">
+          {% for c in all_categories %}
+            <option value="{{ c.slug }}" {% if c.slug == category_slug %}selected{% endif %}>
+              {{ c.slug }} — {{ c.display_name }}
+            </option>
+          {% endfor %}
+          {% if decision.new_category_proposal %}
+            <option value="__new__:{{ decision.new_category_proposal }}">
+              + create "{{ decision.new_category_proposal }}"
+            </option>
+          {% endif %}
+        </select>
+      </label>
+      <label>Filename
+        <input name="filename" value="{{ decision.proposed_filename }}">
+      </label>
+      <div class="buttons">
+        <button type="button" id="btn-refile">Re-file</button>
+        <button type="button" id="btn-approve">Approve as-is</button>
+        <button type="button" id="btn-delete" class="danger">Delete</button>
+      </div>
+    </form>
+  </div>
+</div>
+<script>
+(function () {
+  const form = document.getElementById("refile-form");
+  const id = form.dataset.decisionId;
+  function payload() {
+    const fd = new FormData(form);
+    return {
+      person_slug: fd.get("person_slug"),
+      category_slug: fd.get("category_slug"),
+      filename: fd.get("filename"),
+    };
+  }
+  document.getElementById("btn-refile").onclick = async () => {
+    await aido.postJSON(`/decisions/${id}/re-file`, payload());
+    location.reload();
+  };
+  document.getElementById("btn-approve").onclick = async () => {
+    await aido.postJSON(`/decisions/${id}/approve`, {});
+    location.reload();
+  };
+  document.getElementById("btn-delete").onclick = async () => {
+    if (!confirm("Delete this document?")) return;
+    await aido.postJSON(`/decisions/${id}/delete`, {});
+    location.href = "/";
+  };
+})();
+</script>
+{% endblock %}

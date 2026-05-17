@@ -1,0 +1,10 @@
+{% extends "base.html" %}
+{% block body %}
+<h2>Stats</h2>
+<dl class="stats">
+  <dt>Total decisions</dt><dd>{{ total }}</dd>
+  <dt>Last 7 days</dt><dd>{{ last7 }}</dd>
+  <dt>Needs review</dt><dd>{{ needs_review_count }}</dd>
+  <dt>Average auto-filed confidence</dt><dd>{{ '%.2f' % avg_confidence }}</dd>
+</dl>
+{% endblock %}
