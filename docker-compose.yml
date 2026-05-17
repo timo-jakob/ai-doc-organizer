@@ -16,7 +16,6 @@ services:
       - ./logs:/var/log/aido
       - "${HOME}/Scans/incoming:/scans:rw"
       - "${HOME}/Documents/Archive:/archive:rw"
-      - "${HOME}/.claude:/home/aido/.claude:rw"
     environment:
-      - CLAUDE_CONFIG_DIR=/home/aido/.claude
+      - ANTHROPIC_API_KEY            # auto-substituted from project .env (if present)
       - TZ=Europe/Berlin

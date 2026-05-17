@@ -6,7 +6,11 @@ db_path: /data/aido.sqlite
 log_path: /var/log/aido/aido.log
 
 classifier:
-  backend: agent_sdk                  # agent_sdk | anthropic_api | local_llm | fake
+  # anthropic_api: plain API key in .env (works inside Docker on macOS — Keychain
+  #   isn't reachable from a container, so OAuth via agent_sdk doesn't work there).
+  # agent_sdk: Claude Code via OAuth (Max Plan). Only works where Keychain is
+  #   reachable — i.e. running outside Docker on macOS, or on Linux hosts.
+  backend: anthropic_api              # anthropic_api | agent_sdk | local_llm | fake
   model: claude-opus-4-7
   review_confidence_threshold: 0.75
 
