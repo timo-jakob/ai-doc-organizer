@@ -27,6 +27,9 @@ def create_app(state: WebState) -> Flask:
     from aido.webui.routes import bp as feed_bp
     app.register_blueprint(feed_bp)
 
+    from aido.webui.mutation_routes import bp as mut_bp
+    app.register_blueprint(mut_bp)
+
     @app.route("/healthz")
     def healthz():
         with connect(state.db_path) as conn:
