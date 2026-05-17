@@ -6,7 +6,9 @@
 
 ## 1. Purpose
 
-`aido` watches a scanner inbox folder on a Synology NAS, classifies each incoming PDF using Claude, and files it into a per-person / per-category archive with a structured filename. The user reviews and corrects decisions retrospectively in a LAN-accessible web UI. The system serves a 4-person household sharing one scanner.
+`aido` watches a scanner inbox folder on a household server, classifies each incoming PDF using Claude, and files it into a per-person / per-category archive with a structured filename. The user reviews and corrects decisions retrospectively in a LAN-accessible web UI. The system serves a 4-person household sharing one scanner.
+
+The host for the next ~2 months is the user's MacBook Pro (M1 Max, macOS); it then migrates to a Mac mini using the same Docker Compose recipe.
 
 ### 1.1 Goals (v1)
 
@@ -15,12 +17,12 @@
 - Confidence-aware routing: uncertain or new-category cases land in a `_review/` bucket; nothing is silently lost.
 - Retrospective audit and correction via web UI; corrections are recorded.
 - Stable filing convention so the archive remains usable without the tool.
-- Runs on Synology DS214+ with Python 3.9, no Docker.
-- Classifier behind an interface so a future local-LLM backend can drop in.
+- Runs on macOS (Apple Silicon) via Docker Compose; identical recipe on the MacBook Pro now and the Mac mini later.
+- Classifier behind an interface so additional backends (local LLM, direct Anthropic API) can drop in.
 
 ### 1.2 Non-goals (v1)
 
-OCR fallback for image-only PDFs; multi-document PDF splitting; auth on the web UI; per-user UI views; local LLM implementation; notifications; counterparty normalization; malware scanning; backup of the archive.
+OCR fallback for image-only PDFs; multi-document PDF splitting; auth on the web UI; per-user UI views; local LLM implementation (Mac mini phase, post-MVP); notifications; counterparty normalization; malware scanning; backup of the archive.
 
 ---
 
@@ -62,7 +64,7 @@ OCR fallback for image-only PDFs; multi-document PDF splitting; auth on the web 
 
 | Module | Responsibility |
 |--------|----------------|
-| `watcher` | `watchdog` inotify on the scan inbox; enqueues new PDFs. |
+| `watcher` | `watchdog` file watching on the scan inbox (PollingObserver for bind-mounted host paths; see §8.7); enqueues new PDFs. |
 | `worker` | Stabilize/dedupe → extract text → classify → file → record decision. Single background thread; one doc at a time. |
 | `classifier` | `Classifier` Protocol + `ClaudeAPIClassifier` implementation. The future swap point. |
 | `filing_executor` | Atomic move into archive, filename collision handling. |
@@ -72,7 +74,9 @@ OCR fallback for image-only PDFs; multi-document PDF splitting; auth on the web 
 
 ### 2.2 Process topology
 
-A single Python process hosts watcher, worker pipeline, and the Flask web UI together. Started via Synology Task Scheduler on boot; clean shutdown on system shutdown via SIGTERM. Pidfile at `/volume1/aido/run/aido.pid` prevents double-starts.
+A single Python process inside one Docker container hosts watcher, worker pipeline, and the Flask web UI together. Started by `docker compose up -d`; clean shutdown via Docker's SIGTERM on stop. Container has `restart: unless-stopped` so it survives Docker Desktop restarts on the MacBook Pro.
+
+The container subprocess-spawns the Claude Code CLI (bundled with the Claude Agent SDK) for each classification call. OAuth credentials are read from a mounted volume (`~/.claude` on the host).
 
 ---
 
@@ -154,15 +158,16 @@ class Classifier(Protocol):
 
 Concrete implementations:
 
-- `ClaudeAPIClassifier` — v1; uses the `anthropic` Python SDK with an API key from `.env`. Default model `claude-opus-4-7`; configurable.
-- `LocalLLMClassifier` — Mac mini phase (later); same Protocol.
-- `AgentSDKClassifier` — possibly later (Max Plan via OAuth); requires Python 3.10+, so blocked on Mac mini migration.
+- `AgentSDKClassifier` — v1; uses the Claude Agent SDK for Python authenticated via OAuth against the user's Max Plan. Default model `claude-opus-4-7`; configurable via `ClaudeAgentOptions.model`.
+- `AnthropicAPIClassifier` — opportunistic; uses the `anthropic` Python SDK with an API key. Kept available as a fallback if the Max Plan / Agent SDK path has trouble. Not enabled by default.
+- `LocalLLMClassifier` — Mac mini phase (post-MVP); same Protocol, backed by Ollama with a vision-capable model.
 
 ### 4.2 Prompt strategy
 
-- The system prompt (taxonomy + rules + output schema) is identical across calls so Anthropic's prompt cache applies — after the first call, the system portion is ~90% cheaper.
-- Output requested via tool-use schema for strict typing; the model returns a structured `ClassificationResult` payload.
+- The system prompt (taxonomy + rules + output schema) is set via `ClaudeAgentOptions.system_prompt` and identical across calls so Anthropic's prompt cache applies — after the first call, the cached portion is ~90% cheaper.
+- Output is requested as JSON conforming to the `ClassificationResult` shape; the worker validates and parses it. If the SDK exposes structured-output / tool-use bindings stable enough at implementation time, prefer those for strict typing (a plan-phase detail).
 - The joint-mail rule is in the prompt: *"If the addressee names a single family member, file under that person. Use shared only when no individual family member is identifiable."*
+- One classification = one `claude_agent_sdk.query(...)` call per document; bidirectional streaming is not needed.
 
 ### 4.3 Confidence threshold
 
@@ -187,13 +192,15 @@ The web UI never writes the DB or `config.yaml` directly. Each user action goes 
 
 ### 5.3 Rendering
 
-Server-rendered HTML (Jinja2 templates) with vanilla JavaScript for inline form behavior. No SPA framework. Keeps the DS214+ footprint small and the page weight low.
+Server-rendered HTML (Jinja2 templates) with vanilla JavaScript for inline form behavior. No SPA framework — keeps the image small, the page weight low, and avoids a build step.
 
 ---
 
 ## 6. State: SQLite schema
 
-`detect_types=PARSE_DECLTYPES | PARSE_COLNAMES` so `DATE` / `TIMESTAMP` columns round-trip as `datetime.date` / `datetime.datetime`. `PRAGMA foreign_keys = ON` on every connection. `PRAGMA journal_mode = WAL` for crash safety. STRICT tables are not used (DSM ships SQLite < 3.37); typing is enforced via `CHECK` constraints and Python-side enums.
+`detect_types=PARSE_DECLTYPES | PARSE_COLNAMES` so `DATE` / `TIMESTAMP` columns round-trip as `datetime.date` / `datetime.datetime`. `PRAGMA foreign_keys = ON` on every connection. `PRAGMA journal_mode = WAL` for crash safety.
+
+`STRICT` tables are used — the Docker image targets Python ≥3.13, which ships SQLite 3.45+ (well past the 3.37 STRICT requirement). `CHECK` constraints and Python-side enums layer on top for enum-like fields.
 
 ### 6.1 Lookup tables
 
@@ -317,31 +324,32 @@ CHECK constraints on the DB side + str-mixin enums in Python give belt-and-suspe
 
 ## 7. Configuration
 
+All container-internal paths; host paths are mapped by `docker-compose.yml` (§8).
+
 ```yaml
-# config.yaml
-archive_root: /volume1/homes/timo/Documents/Archive
-scan_inbox:   /volume1/scans/incoming
-db_path:      /volume1/aido/data/aido.sqlite
-log_path:     /volume1/aido/logs/aido.log
+# config.yaml  (lives next to docker-compose.yml on the host, mounted read-only)
+archive_root: /archive
+scan_inbox:   /scans
+db_path:      /data/aido.sqlite
+log_path:     /var/log/aido/aido.log
 
 classifier:
-  backend: claude_api
+  backend: agent_sdk        # 'agent_sdk' | 'anthropic_api' | 'local_llm'
   model:   claude-opus-4-7
   review_confidence_threshold: 0.75
 
 web:
-  bind: 0.0.0.0
+  bind: 0.0.0.0             # bound inside the container; Docker maps to host port
   port: 8765
 ```
 
-- `.env` next to `config.yaml` holds `ANTHROPIC_API_KEY` (chmod 600).
-- Taxonomy (persons, aliases, categories, doctypes) lives in the DB, **not** in `config.yaml`. The DB is the source of truth.
-- `config.yaml` is read at daemon startup and on SIGHUP. Mutations to runtime config are rare; the file is edited by hand.
-- The daemon owns the only writer for `config.yaml` mutations (currently none from the UI, but the writer pattern uses `ruamel.yaml` for round-trip-safe edits if that changes).
+- **Authentication.** The default backend (`agent_sdk`) reads Max Plan OAuth credentials from a mounted volume (`~/.claude` on the host → a known path in the container). No API key is needed for this backend. If the user enables `backend: anthropic_api`, an `ANTHROPIC_API_KEY` from `.env` (also mounted) is used instead.
+- **Taxonomy** (persons, aliases, categories, doctypes) lives in the DB, **not** in `config.yaml`. The DB is the source of truth.
+- `config.yaml` is read at daemon startup. Runtime mutations are rare; the file is edited by hand on the host. The daemon uses `ruamel.yaml` if it ever needs to round-trip-edit the file.
 
 ### 7.1 Bootstrap
 
-A one-shot `aido init` CLI seeds the DB from interactive prompts:
+A one-shot `aido init` CLI (run via `docker compose run --rm aido aido init`) seeds the DB from interactive prompts:
 - Asks for the 4 family members (display name, slug, initial aliases) and creates a `shared` row.
 - Loads a starter category list (`rechnungen`, `steuer`, `medizin`, `vertraege`, `bank`, `versicherung`, `nebenkosten`, `briefe`, `schule`) and a starter doctype list.
 - Creates the archive root and `_review/` if missing.
@@ -349,46 +357,117 @@ A one-shot `aido init` CLI seeds the DB from interactive prompts:
 
 ---
 
-## 8. Synology deployment
+## 8. Deployment (macOS + Docker Compose)
 
-### 8.1 Filesystem
+The same `docker-compose.yml` recipe runs on the MacBook Pro now and on the Mac mini after migration. Apple Silicon throughout.
+
+### 8.1 Host filesystem layout
 
 ```
-/volume1/aido/
-├── venv/                        # Python 3.9 virtualenv
-├── src/aido/...                 # the package
-├── config.yaml
-├── .env                         # chmod 600
+~/aido/                              # project clone on the host
+├── docker-compose.yml
+├── Dockerfile
+├── config.yaml                      # mounted read-only into the container
+├── pyproject.toml
+├── src/aido/...
 ├── data/
-│   └── aido.sqlite
-├── logs/
-│   └── aido.log
-└── run/
-    └── aido.pid
+│   └── aido.sqlite                  # mounted into the container
+└── logs/
+    └── aido.log                     # mounted into the container
 
-/volume1/scans/incoming/         # scanner SMB share, watched
-/volume1/homes/<user>/Documents/Archive/   # archive_root (or shared volume)
+~/Scans/incoming/                    # scanner SMB share / target folder on the host (configurable)
+~/Documents/Archive/                 # archive root on the host (configurable)
+~/.claude/                           # Max Plan OAuth credentials, populated by `claude login`
 ```
 
-### 8.2 Process lifecycle
+### 8.2 docker-compose.yml (sketch)
 
-- **Start on boot**: Synology Task Scheduler → Triggered Task → Boot-up → runs `/volume1/aido/venv/bin/python -m aido.daemon`.
-- **Stop on shutdown**: Triggered Task → Shutdown → sends SIGTERM to the pidfile and waits up to 30s.
-- **Manual control**: `aido start | stop | status | restart` CLI wraps the same.
-- **Daemon refuses to start** if a live process is already running (pidfile check + PID liveness probe).
-- **`GET /healthz`** returns daemon status (`ok` / `auth_failed` / `cannot_write` / `degraded`), last classification timestamp, pending_jobs count, `_review` count.
+```yaml
+services:
+  aido:
+    build: .
+    image: aido:latest
+    container_name: aido
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:8765:8765"        # web UI on host's loopback by default
+    volumes:
+      - ./config.yaml:/app/config.yaml:ro
+      - ./data:/data
+      - ./logs:/var/log/aido
+      - "${HOME}/Scans/incoming:/scans:rw"      # scanner inbox (rw so we can delete after move)
+      - "${HOME}/Documents/Archive:/archive:rw"  # archive root
+      - "${HOME}/.claude:/home/aido/.claude:ro"  # Max Plan OAuth credentials
+    environment:
+      - CLAUDE_CONFIG_DIR=/home/aido/.claude
+      - TZ=Europe/Berlin
+    user: "501:20"                   # macOS-typical UID:GID; tunable
+```
 
-### 8.3 Dependencies (lean, all pure-Python or ARM-compatible wheels)
+Bind the UI to `127.0.0.1` initially; switch to a LAN address (`0.0.0.0` host-side or a published IP) once you want phone/tablet access. That's a one-line edit, not a code change.
 
-- `anthropic` (Python SDK; pure Python)
-- `pypdf` (PDF text extraction; pure Python)
-- `watchdog` (inotify file watching)
-- `flask` (web UI)
-- `jinja2` (templates; transitive)
-- `ruamel.yaml` (round-trip YAML, for future config mutations)
+### 8.3 Dockerfile (sketch)
+
+```dockerfile
+FROM python:3.13-slim AS base
+
+# Node.js runtime is needed because the Claude Agent SDK spawns the bundled
+# Claude Code CLI as a subprocess.
+RUN apt-get update && apt-get install -y --no-install-recommends \
+        ca-certificates curl nodejs npm \
+    && rm -rf /var/lib/apt/lists/*
+
+WORKDIR /app
+
+COPY pyproject.toml ./
+RUN pip install --no-cache-dir .
+
+COPY src/ ./src/
+
+ENV PYTHONUNBUFFERED=1
+EXPOSE 8765
+CMD ["python", "-m", "aido.daemon"]
+```
+
+### 8.4 First-run sequence
+
+1. **On the host**: install Claude Code CLI and run `claude login` once. This populates `~/.claude/` with OAuth tokens for the Max Plan.
+2. `git clone` the repo into `~/aido/` (or chosen location) on the host.
+3. Copy/create `~/Scans/incoming/` and `~/Documents/Archive/`.
+4. `docker compose build && docker compose run --rm aido aido init` — interactive bootstrap (persons, aliases, starter taxonomy, default `config.yaml`).
+5. `docker compose up -d` — daemon starts; web UI on `http://localhost:8765`.
+6. Optional: configure the scanner to deposit PDFs into `~/Scans/incoming/`.
+
+### 8.5 Migration MacBook Pro → Mac mini
+
+1. `docker compose down` on the MacBook Pro.
+2. `rsync -av ~/aido/ user@macmini:~/aido/` (or move the project dir however).
+3. `rsync -av ~/Documents/Archive/ user@macmini:~/Documents/Archive/` and same for `~/Scans/incoming/`.
+4. On the Mac mini: install Claude Code CLI, run `claude login` once.
+5. `docker compose up -d`.
+
+The DB, the YAML config, and the archive are all just files; nothing in the design pins them to a specific host.
+
+### 8.6 Process lifecycle
+
+- `restart: unless-stopped` means the container survives Docker Desktop restarts but stays down if you explicitly stop it.
+- `docker compose down` triggers SIGTERM; the daemon installs a handler that finishes the current document, flushes logs, closes the DB, then exits.
+- A single `aido` CLI (run inside the container via `docker compose exec aido aido ...`) wraps `init`, `status`, and `rebuild-index` subcommands.
+- **`GET /healthz`** returns daemon status (`ok` / `auth_failed` / `cannot_write` / `degraded`), last classification timestamp, `pending_jobs` count, `_review` count.
+
+### 8.7 Dependencies
+
+- `claude-agent-sdk` (Python ≥3.10; bundles the Claude Code CLI for OAuth + Max Plan)
+- `anthropic` (kept as the fallback backend; pure Python)
+- `pypdf` (PDF text extraction)
+- `watchdog` (file watching; uses macOS FSEvents inside the container via polling fallback if needed)
+- `flask` + `jinja2` (web UI)
+- `ruamel.yaml` (round-trip YAML)
 - `pytest` (dev only)
 
-No torch / transformers / heavy ML libs.
+No torch / transformers / heavy ML libs in v1.
+
+**Watchdog note**: inside the Docker container on macOS, Linux `inotify` doesn't work directly on bind-mounted host directories (FSEvents doesn't propagate). The `watchdog` library falls back to its `PollingObserver` for these mounts; we pin to `PollingObserver` explicitly to avoid silent breakage. Polling every 2s is fine for this workload.
 
 ---
 
@@ -400,7 +479,8 @@ No torch / transformers / heavy ML libs.
 | PDF has no text layer | Route to `_review/`; `reason='no_extractable_text'`. OCR is v2. |
 | Anthropic transient (5xx, network) | Add to `pending_jobs`; backoff 1s / 5s / 30s / 5min / 1hr. After 5 attempts → `_review/` with last error preserved. |
 | Anthropic 429 (rate limit) | Respect `Retry-After`; else backoff. |
-| Anthropic 401 (auth) | Log at ERROR; halt classification; daemon stays alive; `/healthz` reports `auth_failed`. |
+| Anthropic 401 (auth) | Log at ERROR; halt classification; daemon stays alive; `/healthz` reports `auth_failed`. (Most likely cause: expired OAuth token — host needs `claude login` again.) |
+| Agent SDK CLI subprocess crash | Captured by the SDK; logged with the CLI's stderr. Job goes to `pending_jobs` for retry. After 3 consecutive subprocess failures `/healthz` reports `degraded`. |
 | AI output fails schema validation | One retry with stricter prompt; then `_review/` with `reason='invalid_classification'`. |
 | AI returns unknown slug | Route to `_review/`; audit captures the raw slug. |
 | Filename collision | Append `_2`, `_3`, … atomically. |
@@ -450,7 +530,7 @@ Deferred to post-MVP iterations driven by family-member feedback:
 - Counterparty normalisation into its own table.
 - Mobile-optimised UI polish beyond basic responsive layout.
 - Malware / anti-virus scanning of incoming PDFs.
-- Archive backup (delegated to Synology's native backup tooling).
+- Archive backup (delegated to the host OS's backup tooling — Time Machine on macOS today, whatever the Mac mini ends up using).
 
 ---
 
@@ -459,10 +539,10 @@ Deferred to post-MVP iterations driven by family-member feedback:
 These don't change the design but are decisions the implementation plan must make:
 
 1. **PDF preview rendering in the web UI**: render the first page server-side (e.g., a thumbnail via `pypdf` + `pillow`) or embed via `<embed>` / `<iframe>` and let the browser handle it. The latter is simpler but heavier on the LAN.
-2. **Web UI internal mutation endpoint**: shared in-process function call vs. internal HTTP. The single-process design allows either; in-process is simpler.
+2. **Web UI mutation transport**: shared in-process function call vs. internal HTTP. The single-process design allows either; in-process is simpler.
 3. **`aido init` interactivity**: pure CLI prompts vs. seed from a starter YAML file. Either works; CLI prompts are friendlier for the user but harder to test.
-
-These are sized to be answered while writing the implementation plan.
+4. **Agent SDK structured output**: whether to use the SDK's tool-use bindings (if stable) or JSON-in-a-system-prompt + parse. Decide based on what the SDK exposes at implementation time.
+5. **OAuth credentials volume mode**: read-only vs. read-write. Read-only is safer; some Agent SDK / CLI versions refresh tokens in-place and need write. Confirm against the installed SDK version before pinning.
 
 ---
 
@@ -477,10 +557,11 @@ These are sized to be answered while writing the implementation plan.
 | Folder layout | `<archive>/<person>/<category>/<file>`, German category names, shared list applied uniformly under every person. |
 | People | 4 family members + `shared/` bucket. |
 | Person ID | AI extracts addressee → matches against persons/aliases in DB. Joint mail with a single named addressee goes to that person; shared is the fallback. |
-| AI backend | Pluggable via `Classifier` Protocol. v1: Claude API (Opus 4.7) via `anthropic` Python SDK + API key. Future: local LLM (Mac mini), Agent SDK + Max Plan (Python 3.10+, post-Synology). |
-| Stack | Python 3.9 on Synology DS214+, no Docker. |
+| AI backend | Pluggable via `Classifier` Protocol. v1: Claude Agent SDK + Max Plan via OAuth (Opus 4.7). Fallback: `anthropic` Python SDK + API key. Future: local LLM (Ollama on Mac mini, post-MVP). |
+| Stack | Python ≥3.13 in a Docker container on macOS (Apple Silicon). MacBook Pro M1 Max for the next ~2 months, then Mac mini. |
+| Packaging | Docker Compose. Same recipe on both hosts. |
 | Languages handled | German (primary), English, Spanish, French, Italian, Dutch. |
 | Volume | Light / moderate; will grow as family adopts. |
-| Process topology | Single daemon, SQLite for state. |
-| Web UI | LAN-bound Flask on `:8765`, no auth, server-rendered HTML. |
+| Process topology | Single daemon (one container), SQLite for state. |
+| Web UI | Loopback-bound Flask on `:8765` initially, opens up to LAN once trusted. No auth, server-rendered HTML. |
 | Rollout | MVP-first; collect feedback from each family member before adding features. |
