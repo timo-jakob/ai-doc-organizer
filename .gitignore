@@ -18,6 +18,9 @@ build/
 # Environment / secrets
 .env
 .env.*
+
+# Per-install config (copy from config.example.yaml on first run)
+/config.yaml
 !.env.example
 
 # Editors / OS
