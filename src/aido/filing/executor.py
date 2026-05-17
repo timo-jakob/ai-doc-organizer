@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import os
+import shutil
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -38,8 +39,9 @@ def file_document(
     """Move `src` to the resolved location inside `archive_root`.
 
     Creates parent directories as needed; resolves filename collisions by
-    appending `_2`, `_3`, .... Uses `os.replace` so the move is atomic on the
-    same filesystem.
+    appending `_2`, `_3`, .... Uses `os.replace` when src and dest are on the
+    same filesystem (atomic rename); falls back to `shutil.move` for the
+    cross-filesystem case (e.g., two separate Docker bind mounts).
     """
     dest_dir = _resolve_dir(archive_root, target)
     dest_dir.mkdir(parents=True, exist_ok=True)
@@ -47,5 +49,11 @@ def file_document(
     resolved_root = archive_root.resolve()
     if not dest.resolve().is_relative_to(resolved_root):
         raise ValueError(f"Destination {dest} escapes archive root {resolved_root}")
-    os.replace(src, dest)
+    try:
+        os.replace(src, dest)
+    except OSError as e:
+        if e.errno == 18:  # EXDEV: cross-device link
+            shutil.move(str(src), str(dest))
+        else:
+            raise
     return dest

@@ -1,4 +1,5 @@
 from pathlib import Path
+from unittest.mock import patch
 
 import pytest
 
@@ -87,3 +88,56 @@ def test_file_document_rejects_path_traversal(tmp_path: Path):
                 filename="evil.pdf",
             ),
         )
+
+
+def test_file_document_falls_back_to_shutil_on_cross_device(tmp_path: Path):
+    """Two separate Docker bind mounts inside one container live on different
+    filesystems; os.replace raises EXDEV. We must fall back to shutil.move."""
+    src = tmp_path / "src.pdf"
+    src.write_bytes(b"hello")
+    archive = tmp_path / "archive"
+
+    real_replace = __import__("os").replace
+    calls = {"count": 0}
+
+    def fake_replace(a, b):
+        calls["count"] += 1
+        if calls["count"] == 1:
+            raise OSError(18, "Invalid cross-device link")
+        return real_replace(a, b)
+
+    with patch("aido.filing.executor.os.replace", side_effect=fake_replace):
+        out = file_document(
+            src,
+            archive_root=archive,
+            target=FilingTarget(
+                person_slug="timo",
+                category_slug="rechnungen",
+                filename="x.pdf",
+            ),
+        )
+
+    assert out == archive / "timo" / "rechnungen" / "x.pdf"
+    assert out.read_bytes() == b"hello"
+    assert not src.exists()
+
+
+def test_file_document_propagates_non_exdev_oserror(tmp_path: Path):
+    src = tmp_path / "src.pdf"
+    src.write_bytes(b"hello")
+    archive = tmp_path / "archive"
+
+    def fake_replace(a, b):
+        raise OSError(13, "Permission denied")  # not EXDEV
+
+    with patch("aido.filing.executor.os.replace", side_effect=fake_replace):
+        with pytest.raises(OSError):
+            file_document(
+                src,
+                archive_root=archive,
+                target=FilingTarget(
+                    person_slug="timo",
+                    category_slug="rechnungen",
+                    filename="x.pdf",
+                ),
+            )
