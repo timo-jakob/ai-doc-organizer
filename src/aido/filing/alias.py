@@ -18,28 +18,42 @@ _GERMAN_MAP = {
 }
 
 
-def _transliterate(text: str) -> str:
-    """Replace German + Latin ligatures, then strip remaining diacritics."""
+def _transliterate(text: str, *, keep_umlaut_ligatures: bool = False) -> str:
+    """Strip diacritics, with optional special-char handling.
+
+    By default, applies the German map to all characters (ü -> ue, ß -> ss, etc).
+    If keep_umlaut_ligatures=True, skips German map for umlaut chars (ä ö ü Ä Ö Ü),
+    leaving them for NFD decomposition instead. Always applies map to non-decomposable
+    ligatures like ß, œ, æ.
+    """
+    # Apply German map selectively or fully.
     out = []
     for ch in text:
         if ch in _GERMAN_MAP:
-            out.append(_GERMAN_MAP[ch])
+            # Skip umlaut transliteration if keep_umlaut_ligatures is set.
+            if keep_umlaut_ligatures and ch in "äöüÄÖÜ":
+                out.append(ch)
+            else:
+                out.append(_GERMAN_MAP[ch])
         else:
             out.append(ch)
     s = "".join(out)
-    # NFKD splits accented letters into base + combining mark; we drop the mark.
-    s = unicodedata.normalize("NFKD", s)
+
+    # NFD decomposes accented letters into base + combining diacritics.
+    # We drop the diacritics, leaving only the base characters.
+    s = unicodedata.normalize("NFD", s)
     return "".join(c for c in s if not unicodedata.combining(c))
 
 
 def alias_normalize(name: str) -> str:
     """Normalise a person name for storage in `alias_normalized`.
 
-    Lowercases, transliterates German/Latin special chars, collapses internal
-    whitespace, strips leading/trailing whitespace. Keeps `.` so initials
-    survive (e.g., 't. jakob').
+    Lowercases, strips diacritics (accent-insensitive matching), collapses internal
+    whitespace, strips leading/trailing whitespace. Keeps `.` so initials survive
+    (e.g., 't. jakob'). Umlauts (ä ö ü) decompose to base chars (a o u) for
+    accent-insensitive matching; non-decomposable ligatures like ß, œ are converted.
     """
-    s = _transliterate(name).lower()
+    s = _transliterate(name, keep_umlaut_ligatures=True).lower()
     s = re.sub(r"\s+", " ", s).strip()
     return s
 
