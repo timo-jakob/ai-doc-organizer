@@ -1,0 +1,28 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>aido — household document organizer</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='app.css') }}">
+</head>
+<body>
+  <header class="topbar">
+    <span class="brand">aido</span>
+    <nav>
+      <a href="{{ url_for('index') }}">Recently filed</a>
+      <a href="/needs-review">
+        Needs review
+        {% if needs_review_count and needs_review_count > 0 %}
+          <span class="badge">{{ needs_review_count }}</span>
+        {% endif %}
+      </a>
+      <a href="/all">All</a>
+      <a href="/settings">Settings</a>
+      <a href="/stats">Stats</a>
+    </nav>
+    <span class="health" data-health="{{ health }}">{{ health }}</span>
+  </header>
+  <main>{% block body %}{% endblock %}</main>
+  <script src="{{ url_for('static', filename='app.js') }}" defer></script>
+</body>
+</html>
