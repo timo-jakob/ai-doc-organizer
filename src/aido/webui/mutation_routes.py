@@ -1,6 +1,8 @@
 """POST endpoints that call into aido.mutations under the daemon's lock."""
 from __future__ import annotations
 
+from pathlib import Path
+
 from flask import Blueprint, abort, current_app, jsonify, request
 
 from aido.mutations import (
@@ -39,14 +41,19 @@ def _resolve_category_id(slug: str) -> int:
 def post_refile(decision_id: int):
     body = request.get_json(force=True) or {}
     try:
+        filename = Path(body["filename"]).name
         re_file(
             _ctx(),
             decision_id,
             person_id=_resolve_person_id(body["person_slug"]),
             category_id=_resolve_category_id(body["category_slug"]),
-            filename=body["filename"],
+            filename=filename,
             note=body.get("note"),
         )
+    except FileNotFoundError as e:
+        abort(404, description=str(e))
+    except KeyError as e:
+        abort(400, description=f"Missing field: {e}")
     except ValueError as e:
         if "Unknown decision" in str(e):
             abort(404)
@@ -58,7 +65,12 @@ def post_refile(decision_id: int):
 def post_rename(decision_id: int):
     body = request.get_json(force=True) or {}
     try:
-        rename(_ctx(), decision_id, filename=body["filename"], note=body.get("note"))
+        filename = Path(body["filename"]).name
+        rename(_ctx(), decision_id, filename=filename, note=body.get("note"))
+    except FileNotFoundError as e:
+        abort(404, description=str(e))
+    except KeyError as e:
+        abort(400, description=f"Missing field: {e}")
     except ValueError as e:
         if "Unknown decision" in str(e):
             abort(404)
@@ -94,15 +106,20 @@ def post_approve(decision_id: int):
 def post_promote(decision_id: int):
     body = request.get_json(force=True) or {}
     try:
+        filename = Path(body["filename"]).name
         promote_category(
             _ctx(),
             decision_id,
             new_category_slug=body["new_category_slug"],
             new_category_display_name=body["new_category_display_name"],
             person_id=_resolve_person_id(body["person_slug"]),
-            filename=body["filename"],
+            filename=filename,
             note=body.get("note"),
         )
+    except FileNotFoundError as e:
+        abort(404, description=str(e))
+    except KeyError as e:
+        abort(400, description=f"Missing field: {e}")
     except ValueError as e:
         if "Unknown decision" in str(e):
             abort(404)

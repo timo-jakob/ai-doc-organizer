@@ -44,5 +44,8 @@ def file_document(
     dest_dir = _resolve_dir(archive_root, target)
     dest_dir.mkdir(parents=True, exist_ok=True)
     dest = next_available_name(dest_dir / target.filename)
+    resolved_root = archive_root.resolve()
+    if not dest.resolve().is_relative_to(resolved_root):
+        raise ValueError(f"Destination {dest} escapes archive root {resolved_root}")
     os.replace(src, dest)
     return dest

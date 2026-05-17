@@ -120,3 +120,21 @@ def test_unknown_decision_returns_404(web):
         "person_slug": "anna", "category_slug": "steuer", "filename": "x.pdf",
     })
     assert rv.status_code == 404
+
+
+def test_refile_when_file_missing_returns_404(web):
+    client, decision_id = web
+    state = client.application.config["AIDO_STATE"]
+    d = get_decision(state.mutations.conn, decision_id)
+    # Delete the filed PDF on disk
+    Path(d.filed_path).unlink()
+    rv = client.post(f"/decisions/{decision_id}/re-file", json={
+        "person_slug": "anna", "category_slug": "steuer", "filename": "x.pdf",
+    })
+    assert rv.status_code == 404
+
+
+def test_refile_with_missing_field_returns_400(web):
+    client, decision_id = web
+    rv = client.post(f"/decisions/{decision_id}/re-file", json={"person_slug": "anna"})
+    assert rv.status_code == 400

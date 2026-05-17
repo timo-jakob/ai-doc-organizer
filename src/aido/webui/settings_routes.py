@@ -58,17 +58,18 @@ def _conn() -> sqlite3.Connection:
 def add_person_route():
     body = request.get_json(force=True) or {}
     slug = body["slug"]
-    if get_person_by_slug(_conn(), slug) is not None:
-        abort(400, description=f"Person slug {slug!r} already exists")
-    with _conn():
-        person = create_person(
-            _conn(),
-            slug=slug,
-            display_name=body["display_name"],
-            is_shared=bool(body.get("is_shared", False)),
-        )
-        for alias in body.get("aliases") or []:
-            add_alias(_conn(), person_id=person.id, alias=alias)
+    with _state().mutations.lock:
+        if get_person_by_slug(_conn(), slug) is not None:
+            abort(400, description=f"Person slug {slug!r} already exists")
+        with _conn():
+            person = create_person(
+                _conn(),
+                slug=slug,
+                display_name=body["display_name"],
+                is_shared=bool(body.get("is_shared", False)),
+            )
+            for alias in body.get("aliases") or []:
+                add_alias(_conn(), person_id=person.id, alias=alias)
     return jsonify({"ok": True, "id": person.id})
 
 
@@ -76,8 +77,9 @@ def add_person_route():
 def add_alias_route(person_id: int):
     body = request.get_json(force=True) or {}
     try:
-        with _conn():
-            row = add_alias(_conn(), person_id=person_id, alias=body["alias"])
+        with _state().mutations.lock:
+            with _conn():
+                row = add_alias(_conn(), person_id=person_id, alias=body["alias"])
     except sqlite3.IntegrityError as e:
         abort(400, description=str(e))
     return jsonify({"ok": True, "id": row.id})
@@ -87,15 +89,16 @@ def add_alias_route(person_id: int):
 def add_category_route():
     body = request.get_json(force=True) or {}
     slug = body["slug"]
-    if get_category_by_slug(_conn(), slug) is not None:
-        abort(400, description=f"Category slug {slug!r} already exists")
-    with _conn():
-        cat = create_category(
-            _conn(),
-            slug=slug,
-            display_name=body["display_name"],
-            description=body.get("description"),
-        )
+    with _state().mutations.lock:
+        if get_category_by_slug(_conn(), slug) is not None:
+            abort(400, description=f"Category slug {slug!r} already exists")
+        with _conn():
+            cat = create_category(
+                _conn(),
+                slug=slug,
+                display_name=body["display_name"],
+                description=body.get("description"),
+            )
     return jsonify({"ok": True, "id": cat.id})
 
 
@@ -103,13 +106,14 @@ def add_category_route():
 def add_doctype_route():
     body = request.get_json(force=True) or {}
     slug = body["slug"]
-    if get_doctype_by_slug(_conn(), slug) is not None:
-        abort(400, description=f"Doctype slug {slug!r} already exists")
-    with _conn():
-        dt = create_doctype(
-            _conn(),
-            slug=slug,
-            display_name=body["display_name"],
-            description=body.get("description"),
-        )
+    with _state().mutations.lock:
+        if get_doctype_by_slug(_conn(), slug) is not None:
+            abort(400, description=f"Doctype slug {slug!r} already exists")
+        with _conn():
+            dt = create_doctype(
+                _conn(),
+                slug=slug,
+                display_name=body["display_name"],
+                description=body.get("description"),
+            )
     return jsonify({"ok": True, "id": dt.id})

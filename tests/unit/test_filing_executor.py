@@ -1,5 +1,7 @@
 from pathlib import Path
 
+import pytest
+
 from aido.filing.executor import FilingTarget, file_document
 
 
@@ -69,3 +71,19 @@ def test_creates_missing_directories(tmp_path: Path):
     )
     assert out.exists()
     assert out.parent == archive / "anna" / "medizin"
+
+
+def test_file_document_rejects_path_traversal(tmp_path: Path):
+    src = tmp_path / "src.pdf"
+    src.write_bytes(b"x")
+    archive = tmp_path / "archive"
+    with pytest.raises(ValueError, match="escapes archive root"):
+        file_document(
+            src,
+            archive_root=archive,
+            target=FilingTarget(
+                person_slug="..",
+                category_slug="..",
+                filename="evil.pdf",
+            ),
+        )
