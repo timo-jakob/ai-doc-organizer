@@ -1,0 +1,35 @@
+# Visual companion sandbox (mockups + server state from brainstorming)
+.superpowers/
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+.venv/
+venv/
+env/
+.eggs/
+*.egg-info/
+dist/
+build/
+
+# Environment / secrets
+.env
+.env.*
+!.env.example
+
+# Editors / OS
+.DS_Store
+.idea/
+.vscode/
+*.swp
+
+# Local data (when the project is built out)
+data/
+logs/
+*.sqlite
+*.sqlite-journal
+*.sqlite-wal
+*.sqlite-shm
