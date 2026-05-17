@@ -51,3 +51,53 @@ def test_healthz_returns_json(web):
     body = rv.get_json()
     assert body["status"] == "ok"
     assert "needs_review" in body
+
+
+def test_needs_review_tab_shows_only_uncertain(web):
+    # Drive through the daemon would be heavy; insert decisions directly.
+    from datetime import datetime, timezone
+
+    from aido.store.connection import connect
+    from aido.store.decisions import NewDecision, insert_decision
+    from aido.store.persons import get_person_by_slug
+    from aido.store.taxonomy import get_category_by_slug, get_review_category
+    from aido.types import DecisionStatus
+
+    state = web.application.config["AIDO_STATE"]
+    with connect(state.db_path) as conn:
+        timo = get_person_by_slug(conn, "timo")
+        cat = get_category_by_slug(conn, "rechnungen")
+        review = get_review_category(conn)
+        insert_decision(conn, NewDecision(
+            created_at=datetime(2026, 5, 17, 10, tzinfo=timezone.utc),
+            source_hash="h1", source_path="/s", filed_path="/a",
+            person_id=timo.id, category_id=cat.id, doctype_id=None,
+            document_date=None, counterparty="t",
+            proposed_filename="x.pdf",
+            overall_confidence=0.9, person_confidence=0.9, category_confidence=0.9,
+            reasoning="confident", classifier_model="m",
+            new_category_proposal=None, needs_review=False,
+            status=DecisionStatus.AUTO_FILED,
+        ))
+        insert_decision(conn, NewDecision(
+            created_at=datetime(2026, 5, 17, 11, tzinfo=timezone.utc),
+            source_hash="h2", source_path="/s", filed_path="/a",
+            person_id=timo.id, category_id=review.id, doctype_id=None,
+            document_date=None, counterparty=None,
+            proposed_filename="uncertain.pdf",
+            overall_confidence=0.4, person_confidence=0.4, category_confidence=0.4,
+            reasoning="hesitant", classifier_model="m",
+            new_category_proposal=None, needs_review=True,
+            status=DecisionStatus.REVIEW,
+        ))
+
+    rv_all = web.get("/all")
+    assert rv_all.status_code == 200
+    body = rv_all.get_data(as_text=True)
+    assert "x.pdf" in body
+    assert "uncertain.pdf" in body
+
+    rv_review = web.get("/needs-review")
+    body = rv_review.get_data(as_text=True)
+    assert "uncertain.pdf" in body
+    assert "x.pdf" not in body

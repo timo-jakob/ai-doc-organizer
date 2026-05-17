@@ -24,13 +24,8 @@ def create_app(state: WebState) -> Flask:
     app = Flask(__name__, template_folder="templates", static_folder="static")
     app.config["AIDO_STATE"] = state
 
-    @app.route("/")
-    def index() -> str:
-        # Real feed is implemented in Task 26; for now show the shell.
-        with connect(state.db_path) as conn:
-            pending = count_needs_review(conn)
-        return render_template("base.html", needs_review_count=pending,
-                               health=state.health.status.value)
+    from aido.webui.routes import bp as feed_bp
+    app.register_blueprint(feed_bp)
 
     @app.route("/healthz")
     def healthz():

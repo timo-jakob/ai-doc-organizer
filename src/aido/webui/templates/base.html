@@ -9,14 +9,14 @@
   <header class="topbar">
     <span class="brand">aido</span>
     <nav>
-      <a href="{{ url_for('index') }}">Recently filed</a>
-      <a href="/needs-review">
+      <a href="{{ url_for('feed.index') }}">Recently filed</a>
+      <a href="{{ url_for('feed.needs_review') }}">
         Needs review
         {% if needs_review_count and needs_review_count > 0 %}
           <span class="badge">{{ needs_review_count }}</span>
         {% endif %}
       </a>
-      <a href="/all">All</a>
+      <a href="{{ url_for('feed.all_decisions') }}">All</a>
       <a href="/settings">Settings</a>
       <a href="/stats">Stats</a>
     </nav>
