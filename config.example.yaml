@@ -15,5 +15,5 @@ classifier:
   review_confidence_threshold: 0.75
 
 web:
-  bind: 0.0.0.0                       # bound inside the container; Docker maps to host
+  bind: 0.0.0.0                       # safe inside Docker (compose maps to 127.0.0.1); change to 127.0.0.1 if running outside Docker
   port: 8765
