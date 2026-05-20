@@ -16,9 +16,16 @@ REPO_ROOT = Path(__file__).resolve().parents[2]
 @pytest.mark.skipif(not DOCKER_AVAILABLE, reason="docker not on PATH")
 def test_image_builds_and_healthz_responds(tmp_path: Path):
     # Build image with a unique tag so we don't trample local state.
+    # Pass host UID/GID so bind-mounted dirs are writable by the container
+    # user (Dockerfile defaults match macOS but not Linux CI runners).
     tag = f"aido-test:{os.getpid()}"
     subprocess.run(
-        ["docker", "build", "-t", tag, "."],
+        [
+            "docker", "build",
+            "--build-arg", f"UID={os.getuid()}",
+            "--build-arg", f"GID={os.getgid()}",
+            "-t", tag, ".",
+        ],
         cwd=REPO_ROOT, check=True,
     )
 
