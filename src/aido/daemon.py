@@ -3,7 +3,6 @@ from __future__ import annotations
 
 import logging
 import os
-import signal
 import sqlite3
 import threading
 from dataclasses import dataclass, field
@@ -155,13 +154,6 @@ class Daemon:
             finally:
                 self._conn = None
         self._release_pidfile()
-
-    def install_signal_handlers(self) -> None:
-        def _handler(signum, frame):
-            _log.info("daemon.sigterm", extra={"signum": signum})
-            self.stop()
-        signal.signal(signal.SIGTERM, _handler)
-        signal.signal(signal.SIGINT, _handler)
 
     # ---- worker loop --------------------------------------------------
 
