@@ -1,0 +1,66 @@
+# Snyk policy file.
+# Docs: https://docs.snyk.io/manage-issues/policies/the-.snyk-file
+#
+# Use `ignore` to silence findings only with justification + an expiration date.
+# Long-lived ignores are a smell — prefer fixing the underlying issue.
+
+version: v1.25.0
+ignore:
+  # --- Base-image distro CVEs from python:3.13-slim-bookworm ---------------
+  # These ship with the Debian 12 base image and cannot be fixed at the
+  # application level. Snyk's container scan flags them via the chain
+  # tesseract/poppler/python3-defaults → libxml2/libexpat1/etc. Each gets a
+  # 90-day expiry — when these expire, re-pull the latest digest of
+  # python:3.13-slim-bookworm (or migrate to a newer Debian rebuild) and
+  # check whether the CVE has been patched upstream.
+  SNYK-DEBIAN12-EXPAT-16650100:
+    - "*":
+        reason: Base-image CVE (libexpat1 in bookworm); awaiting Debian patch.
+        expires: "2026-08-23T00:00:00.000Z"
+        created: "2026-05-25T00:00:00.000Z"
+  SNYK-DEBIAN12-GNUTLS28-16344297:
+    - "*":
+        reason: Base-image CVE (gnutls28/libgnutls30); awaiting Debian patch.
+        expires: "2026-08-23T00:00:00.000Z"
+        created: "2026-05-25T00:00:00.000Z"
+  SNYK-DEBIAN12-GNUTLS28-16344303:
+    - "*":
+        reason: Base-image CVE (gnutls28/libgnutls30); awaiting Debian patch.
+        expires: "2026-08-23T00:00:00.000Z"
+        created: "2026-05-25T00:00:00.000Z"
+  SNYK-DEBIAN12-GNUTLS28-16344322:
+    - "*":
+        reason: Base-image CVE (gnutls28/libgnutls30); awaiting Debian patch.
+        expires: "2026-08-23T00:00:00.000Z"
+        created: "2026-05-25T00:00:00.000Z"
+  SNYK-DEBIAN12-GNUTLS28-16344325:
+    - "*":
+        reason: Base-image CVE (gnutls28/libgnutls30); awaiting Debian patch.
+        expires: "2026-08-23T00:00:00.000Z"
+        created: "2026-05-25T00:00:00.000Z"
+  SNYK-DEBIAN12-GNUTLS28-16344333:
+    - "*":
+        reason: Base-image CVE (gnutls28/libgnutls30); awaiting Debian patch.
+        expires: "2026-08-23T00:00:00.000Z"
+        created: "2026-05-25T00:00:00.000Z"
+  SNYK-DEBIAN12-GNUTLS28-16344340:
+    - "*":
+        reason: Base-image CVE (gnutls28/libgnutls30); awaiting Debian patch.
+        expires: "2026-08-23T00:00:00.000Z"
+        created: "2026-05-25T00:00:00.000Z"
+  SNYK-DEBIAN12-LIBXML2-16192371:
+    - "*":
+        reason: Base-image CVE (libxml2 via tesseract); awaiting Debian patch.
+        expires: "2026-08-23T00:00:00.000Z"
+        created: "2026-05-25T00:00:00.000Z"
+  SNYK-DEBIAN12-NODEJS-14954746:
+    - "*":
+        reason: Base-image CVE (nodejs apt package); awaiting Debian patch.
+        expires: "2026-08-23T00:00:00.000Z"
+        created: "2026-05-25T00:00:00.000Z"
+  SNYK-DEBIAN12-ZLIB-6008963:
+    - "*":
+        reason: Base-image CVE (zlib transitive); awaiting Debian patch.
+        expires: "2026-08-23T00:00:00.000Z"
+        created: "2026-05-25T00:00:00.000Z"
+patch: {}

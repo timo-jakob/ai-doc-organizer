@@ -1,5 +1,6 @@
 """Tests for the OCR fallback. These tests use real Tesseract; if not
 installed on the host they skip automatically."""
+
 from __future__ import annotations
 
 import shutil
@@ -10,7 +11,6 @@ from fpdf import FPDF
 from PIL import Image, ImageDraw, ImageFont
 
 from aido.pdf.ocr import OcrStatus, ocr_text
-
 
 TESSERACT_AVAILABLE = shutil.which("tesseract") is not None
 POPPLER_AVAILABLE = shutil.which("pdftoppm") is not None

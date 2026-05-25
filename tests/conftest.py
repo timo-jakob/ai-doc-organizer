@@ -1,8 +1,11 @@
 """Shared pytest fixtures for aido tests."""
+
 from __future__ import annotations
 
+import contextlib
 import logging
 from pathlib import Path
+
 import pytest
 
 
@@ -21,10 +24,8 @@ def _reset_aido_logging():
     logger = logging.getLogger("aido")
     for h in list(logger.handlers):
         logger.removeHandler(h)
-        try:
+        with contextlib.suppress(Exception):
             h.close()
-        except Exception:
-            pass
 
     yield
 
@@ -33,10 +34,8 @@ def _reset_aido_logging():
     logger = logging.getLogger("aido")
     for h in list(logger.handlers):
         logger.removeHandler(h)
-        try:
+        with contextlib.suppress(Exception):
             h.close()
-        except Exception:
-            pass
 
 
 @pytest.fixture

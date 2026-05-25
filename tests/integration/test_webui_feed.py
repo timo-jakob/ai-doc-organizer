@@ -1,18 +1,20 @@
-from datetime import date
+from datetime import UTC
 
 import pytest
 
-from aido.webui.app import create_app, WebState
+from aido.webui.app import WebState, create_app
 
 
 @pytest.fixture
 def web(tmp_path):
+    import threading
+
+    from aido.mutations import MutationContext
     from aido.store.connection import connect
     from aido.store.migrations import init_db
     from aido.store.persons import create_person
     from aido.store.taxonomy import create_category, create_doctype
-    import threading
-    from aido.mutations import MutationContext
+
     archive = tmp_path / "archive"
     archive.mkdir()
     db = tmp_path / "x.sqlite"
@@ -23,17 +25,21 @@ def web(tmp_path):
         create_category(conn, slug="_review", display_name="_review", is_review=True)
         create_doctype(conn, slug="rechnung", display_name="Rechnung")
         from aido.daemon import HealthState
+
         state = WebState(
             db_path=db,
             archive_root=archive,
             mutations=MutationContext(
-                conn=conn, archive_root=archive, lock=threading.Lock(),
+                conn=conn,
+                archive_root=archive,
+                lock=threading.Lock(),
                 now=lambda: __import__("datetime").datetime.now(),
             ),
             health=HealthState(),
         )
         app = create_app(state)
-        app.config["TESTING"] = True
+        # nosemgrep: python.flask.security.audit.hardcoded-config.avoid_hardcoded_config_TESTING
+        app.config["TESTING"] = True  # required by Flask's test client; this is a test fixture
         yield app.test_client()
 
 
@@ -55,7 +61,7 @@ def test_healthz_returns_json(web):
 
 def test_needs_review_tab_shows_only_uncertain(web):
     # Drive through the daemon would be heavy; insert decisions directly.
-    from datetime import datetime, timezone
+    from datetime import datetime
 
     from aido.store.connection import connect
     from aido.store.decisions import NewDecision, insert_decision
@@ -68,28 +74,52 @@ def test_needs_review_tab_shows_only_uncertain(web):
         timo = get_person_by_slug(conn, "timo")
         cat = get_category_by_slug(conn, "rechnungen")
         review = get_review_category(conn)
-        insert_decision(conn, NewDecision(
-            created_at=datetime(2026, 5, 17, 10, tzinfo=timezone.utc),
-            source_hash="h1", source_path="/s", filed_path="/a",
-            person_id=timo.id, category_id=cat.id, doctype_id=None,
-            document_date=None, counterparty="t",
-            proposed_filename="x.pdf",
-            overall_confidence=0.9, person_confidence=0.9, category_confidence=0.9,
-            reasoning="confident", classifier_model="m",
-            new_category_proposal=None, needs_review=False,
-            status=DecisionStatus.AUTO_FILED,
-        ))
-        insert_decision(conn, NewDecision(
-            created_at=datetime(2026, 5, 17, 11, tzinfo=timezone.utc),
-            source_hash="h2", source_path="/s", filed_path="/a",
-            person_id=timo.id, category_id=review.id, doctype_id=None,
-            document_date=None, counterparty=None,
-            proposed_filename="uncertain.pdf",
-            overall_confidence=0.4, person_confidence=0.4, category_confidence=0.4,
-            reasoning="hesitant", classifier_model="m",
-            new_category_proposal=None, needs_review=True,
-            status=DecisionStatus.REVIEW,
-        ))
+        insert_decision(
+            conn,
+            NewDecision(
+                created_at=datetime(2026, 5, 17, 10, tzinfo=UTC),
+                source_hash="h1",
+                source_path="/s",
+                filed_path="/a",
+                person_id=timo.id,
+                category_id=cat.id,
+                doctype_id=None,
+                document_date=None,
+                counterparty="t",
+                proposed_filename="x.pdf",
+                overall_confidence=0.9,
+                person_confidence=0.9,
+                category_confidence=0.9,
+                reasoning="confident",
+                classifier_model="m",
+                new_category_proposal=None,
+                needs_review=False,
+                status=DecisionStatus.AUTO_FILED,
+            ),
+        )
+        insert_decision(
+            conn,
+            NewDecision(
+                created_at=datetime(2026, 5, 17, 11, tzinfo=UTC),
+                source_hash="h2",
+                source_path="/s",
+                filed_path="/a",
+                person_id=timo.id,
+                category_id=review.id,
+                doctype_id=None,
+                document_date=None,
+                counterparty=None,
+                proposed_filename="uncertain.pdf",
+                overall_confidence=0.4,
+                person_confidence=0.4,
+                category_confidence=0.4,
+                reasoning="hesitant",
+                classifier_model="m",
+                new_category_proposal=None,
+                needs_review=True,
+                status=DecisionStatus.REVIEW,
+            ),
+        )
 
     rv_all = web.get("/all")
     assert rv_all.status_code == 200

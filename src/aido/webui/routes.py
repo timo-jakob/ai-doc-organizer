@@ -1,10 +1,11 @@
 """Feed routes: /, /needs-review, /all."""
+
 from __future__ import annotations
 
-from flask import Blueprint, current_app, render_template, abort, send_file
+from flask import Blueprint, abort, current_app, render_template, send_file
 
 from aido.store.connection import connect
-from aido.store.decisions import count_needs_review, list_recent, get_decision
+from aido.store.decisions import count_needs_review, get_decision, list_recent
 from aido.store.persons import list_persons
 from aido.store.taxonomy import list_categories
 
@@ -73,13 +74,15 @@ def _hydrate(conn, decisions):
         cat = conn.execute(
             "SELECT slug, display_name FROM categories WHERE id = ?", (d.category_id,)
         ).fetchone()
-        out.append({
-            "decision": d,
-            "person_slug": person["slug"] if person else "?",
-            "person_display": person["display_name"] if person else "?",
-            "category_slug": cat["slug"] if cat else "?",
-            "category_display": cat["display_name"] if cat else "?",
-        })
+        out.append(
+            {
+                "decision": d,
+                "person_slug": person["slug"] if person else "?",
+                "person_display": person["display_name"] if person else "?",
+                "category_slug": cat["slug"] if cat else "?",
+                "category_display": cat["display_name"] if cat else "?",
+            }
+        )
     return out
 
 
@@ -119,6 +122,7 @@ def pdf(decision_id: int):
     if d is None:
         abort(404)
     from pathlib import Path
+
     p = Path(d.filed_path)
     if not p.exists():
         abort(404)

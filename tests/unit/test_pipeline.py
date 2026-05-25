@@ -1,7 +1,6 @@
 # tests/unit/test_pipeline.py
 import threading
-import time
-from datetime import date, datetime, timezone
+from datetime import UTC, date, datetime
 from pathlib import Path
 
 import pytest
@@ -9,29 +8,29 @@ import pytest
 from aido.classifier.fake import FakeClassifier
 from aido.mutations import MutationContext
 from aido.store.connection import connect
-from aido.store.decisions import find_by_source_hash, get_decision
+from aido.store.decisions import find_by_source_hash
 from aido.store.migrations import init_db
 from aido.store.persons import create_person
 from aido.store.taxonomy import create_category, create_doctype
 from aido.types import ClassificationResult, DecisionStatus
-from aido.worker.pipeline import PipelineOutcome, Pipeline
+from aido.worker.pipeline import Pipeline, PipelineOutcome
 from tests.fixtures import synth_empty_pdf, synth_pdf
 
 
 def _result(**over) -> ClassificationResult:
-    base = dict(
-        person_slug="timo",
-        category_slug="rechnungen",
-        doctype_slug="rechnung",
-        document_date=date(2026, 3, 12),
-        counterparty="telekom",
-        proposed_filename="2026-03-12_rechnung_telekom.pdf",
-        overall_confidence=0.93,
-        person_confidence=0.95,
-        category_confidence=0.91,
-        new_category_proposal=None,
-        reasoning="r",
-    )
+    base = {
+        "person_slug": "timo",
+        "category_slug": "rechnungen",
+        "doctype_slug": "rechnung",
+        "document_date": date(2026, 3, 12),
+        "counterparty": "telekom",
+        "proposed_filename": "2026-03-12_rechnung_telekom.pdf",
+        "overall_confidence": 0.93,
+        "person_confidence": 0.95,
+        "category_confidence": 0.91,
+        "new_category_proposal": None,
+        "reasoning": "r",
+    }
     base.update(over)
     return ClassificationResult(**base)
 
@@ -51,7 +50,7 @@ def setup(tmp_path):
             conn=conn,
             archive_root=archive,
             lock=threading.Lock(),
-            now=lambda: datetime(2026, 5, 17, 10, tzinfo=timezone.utc),
+            now=lambda: datetime(2026, 5, 17, 10, tzinfo=UTC),
         )
         yield {"conn": conn, "archive": archive, "mctx": mctx, "tmp": tmp_path}
 
@@ -155,4 +154,5 @@ def test_classifier_exception_routes_to_review(setup):
 
 def _hash_of(path: Path) -> str:
     from aido.pdf.hash import sha256_of_file
+
     return sha256_of_file(path)

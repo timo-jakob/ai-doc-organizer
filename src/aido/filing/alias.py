@@ -5,16 +5,24 @@
 filesystem-safe slug (lowercased, hyphen-separated, ASCII-only) used in
 filenames and folder paths.
 """
+
 from __future__ import annotations
 
 import re
 import unicodedata
 
 _GERMAN_MAP = {
-    "ä": "ae", "ö": "oe", "ü": "ue", "ß": "ss",
-    "Ä": "ae", "Ö": "oe", "Ü": "ue",
-    "œ": "oe", "Œ": "oe",
-    "æ": "ae", "Æ": "ae",
+    "ä": "ae",
+    "ö": "oe",
+    "ü": "ue",
+    "ß": "ss",
+    "Ä": "ae",
+    "Ö": "oe",
+    "Ü": "ue",
+    "œ": "oe",
+    "Œ": "oe",
+    "æ": "ae",
+    "Æ": "ae",
 }
 
 

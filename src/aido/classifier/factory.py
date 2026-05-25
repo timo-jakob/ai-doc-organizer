@@ -1,4 +1,5 @@
 """Pick a concrete Classifier implementation given config."""
+
 from __future__ import annotations
 
 import os
@@ -18,9 +19,7 @@ def build_classifier(conn: sqlite3.Connection, cfg: ClassifierConfig) -> Classif
         case ClassifierBackend.ANTHROPIC_API:
             api_key = os.environ.get("ANTHROPIC_API_KEY")
             if not api_key:
-                raise RuntimeError(
-                    "classifier.backend=anthropic_api requires ANTHROPIC_API_KEY"
-                )
+                raise RuntimeError("classifier.backend=anthropic_api requires ANTHROPIC_API_KEY")
             return AnthropicAPIClassifier(conn=conn, model=cfg.model, api_key=api_key)
         case ClassifierBackend.LOCAL_LLM:
             raise NotImplementedError(

@@ -1,14 +1,15 @@
 """YAML config loader for aido."""
+
 from __future__ import annotations
 
 from dataclasses import dataclass
-from enum import Enum
+from enum import StrEnum
 from pathlib import Path
 
 from ruamel.yaml import YAML
 
 
-class ClassifierBackend(str, Enum):
+class ClassifierBackend(StrEnum):
     AGENT_SDK = "agent_sdk"
     ANTHROPIC_API = "anthropic_api"
     LOCAL_LLM = "local_llm"
@@ -66,7 +67,9 @@ def load_config(path: Path) -> Config:
         raise ValueError(f"Unknown classifier backend: {backend_raw!r}") from e
     threshold = float(_require(cls, "review_confidence_threshold"))
     if not (0.0 <= threshold <= 1.0):
-        raise ValueError(f"classifier.review_confidence_threshold must be in [0, 1] (got {threshold})")
+        raise ValueError(
+            f"classifier.review_confidence_threshold must be in [0, 1] (got {threshold})"
+        )
 
     web = _require(raw, "web")
     if not isinstance(web, dict):

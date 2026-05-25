@@ -1,0 +1,30 @@
+# Dependabot config — automated dependency updates.
+
+version: 2
+updates:
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+    groups:
+      actions-minor-patch:
+        update-types: ["minor", "patch"]
+
+  - package-ecosystem: "pip"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+    groups:
+      pip-minor-patch:
+        update-types: ["minor", "patch"]
+
+  # Tracks the FROM line(s) in your Dockerfile(s). Without this, a CVE in
+  # `python:3.12-slim` or `node:20-alpine` lingers indefinitely because
+  # nothing pulls the latest tag.
+  - package-ecosystem: "docker"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+    groups:
+      docker-minor-patch:
+        update-types: ["minor", "patch"]

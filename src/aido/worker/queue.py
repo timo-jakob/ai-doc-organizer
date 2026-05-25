@@ -1,4 +1,5 @@
 """Single-producer queue between watcher and worker."""
+
 from __future__ import annotations
 
 import queue
@@ -23,6 +24,9 @@ class InboxQueue:
     def drain_existing(self, inbox: Path) -> None:
         """Enqueue every top-level PDF currently in `inbox`. Skips dotfiles."""
         for entry in sorted(inbox.iterdir()):
-            if entry.is_file() and not entry.name.startswith(".") \
-                    and entry.suffix.lower() == ".pdf":
+            if (
+                entry.is_file()
+                and not entry.name.startswith(".")
+                and entry.suffix.lower() == ".pdf"
+            ):
                 self.put(entry)

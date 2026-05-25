@@ -1,14 +1,12 @@
 import threading
-import time
 from pathlib import Path
-
-import pytest
 
 from aido.main import RuntimeContext, build_runtime
 
 
 def _write_config(path: Path, *, archive, inbox, db, log) -> Path:
-    path.write_text(f"""
+    path.write_text(
+        f"""
 archive_root: {archive}
 scan_inbox: {inbox}
 db_path: {db}
@@ -22,18 +20,23 @@ classifier:
 web:
   bind: 127.0.0.1
   port: 0
-""".strip(), encoding="utf-8")
+""".strip(),
+        encoding="utf-8",
+    )
     return path
 
 
 def test_build_runtime_returns_wired_context(tmp_path: Path):
     archive = tmp_path / "archive"
     inbox = tmp_path / "inbox"
-    archive.mkdir(); inbox.mkdir()
+    archive.mkdir()
+    inbox.mkdir()
     cfg = _write_config(
         tmp_path / "config.yaml",
-        archive=archive, inbox=inbox,
-        db=tmp_path / "aido.sqlite", log=tmp_path / "aido.log",
+        archive=archive,
+        inbox=inbox,
+        db=tmp_path / "aido.sqlite",
+        log=tmp_path / "aido.log",
     )
 
     rt = build_runtime(config_path=cfg, pidfile=tmp_path / "aido.pid")
@@ -55,11 +58,14 @@ def test_main_entrypoint_starts_and_stops(tmp_path: Path):
     """
     archive = tmp_path / "archive"
     inbox = tmp_path / "inbox"
-    archive.mkdir(); inbox.mkdir()
+    archive.mkdir()
+    inbox.mkdir()
     cfg = _write_config(
         tmp_path / "config.yaml",
-        archive=archive, inbox=inbox,
-        db=tmp_path / "aido.sqlite", log=tmp_path / "aido.log",
+        archive=archive,
+        inbox=inbox,
+        db=tmp_path / "aido.sqlite",
+        log=tmp_path / "aido.log",
     )
     pidfile = tmp_path / "aido.pid"
 
@@ -71,8 +77,11 @@ def test_main_entrypoint_starts_and_stops(tmp_path: Path):
 
     def runner():
         rt_holder["rt"] = run(
-            config_path=cfg, pidfile=pidfile,
-            ready_event=started, stop_event=stopped, run_web=False,
+            config_path=cfg,
+            pidfile=pidfile,
+            ready_event=started,
+            stop_event=stopped,
+            run_web=False,
         )
 
     t = threading.Thread(target=runner, daemon=True)

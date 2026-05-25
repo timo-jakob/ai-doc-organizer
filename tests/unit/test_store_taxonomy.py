@@ -1,3 +1,5 @@
+import sqlite3
+
 import pytest
 
 from aido.store.connection import connect
@@ -23,8 +25,9 @@ def conn(tmp_path):
 
 
 def test_create_and_get_category(conn):
-    c = create_category(conn, slug="rechnungen", display_name="Rechnungen",
-                        description="Eingehende Rechnungen")
+    c = create_category(
+        conn, slug="rechnungen", display_name="Rechnungen", description="Eingehende Rechnungen"
+    )
     assert isinstance(c, CategoryRow)
     assert c.slug == "rechnungen"
     assert c.is_review is False
@@ -49,8 +52,12 @@ def test_list_categories_alphabetical_active_only(conn):
 
 
 def test_create_and_get_doctype(conn):
-    d = create_doctype(conn, slug="rechnung", display_name="Rechnung",
-                       description="Eine Rechnung von einem Anbieter")
+    d = create_doctype(
+        conn,
+        slug="rechnung",
+        display_name="Rechnung",
+        description="Eine Rechnung von einem Anbieter",
+    )
     assert isinstance(d, DoctypeRow)
     assert get_doctype_by_slug(conn, "rechnung") == d
 
@@ -64,5 +71,5 @@ def test_list_doctypes(conn):
 
 def test_duplicate_slug_raises(conn):
     create_category(conn, slug="x", display_name="X")
-    with pytest.raises(Exception):
+    with pytest.raises(sqlite3.IntegrityError):
         create_category(conn, slug="x", display_name="Y")

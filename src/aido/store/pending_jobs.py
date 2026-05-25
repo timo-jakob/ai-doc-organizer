@@ -1,4 +1,5 @@
 """Retry queue for classifier failures."""
+
 from __future__ import annotations
 
 import sqlite3
@@ -10,6 +11,17 @@ _COLS = (
     "next_attempt_at AS 'next_attempt_at [DATETIME]', "
     "last_error, "
     "created_at AS 'created_at [DATETIME]'"
+)
+# Adjacent-string-literal concatenation (compile-time) — no runtime `+` or
+# f-string so ruff S608 + semgrep formatted-sql-query don't misfire. All
+# variable inputs flow through `?` placeholders.
+_SQL_CLAIM_DUE = (
+    "SELECT id, source_path, source_hash, attempts, "
+    "next_attempt_at AS 'next_attempt_at [DATETIME]', "
+    "last_error, "
+    "created_at AS 'created_at [DATETIME]' "
+    "FROM pending_jobs WHERE next_attempt_at <= ? "
+    "ORDER BY next_attempt_at ASC LIMIT ?"
 )
 
 
@@ -52,14 +64,8 @@ def enqueue_pending(
     return cur.lastrowid
 
 
-def claim_due(
-    conn: sqlite3.Connection, *, now: datetime, limit: int = 10
-) -> list[PendingJobRow]:
-    rows = conn.execute(
-        f"SELECT {_COLS} FROM pending_jobs WHERE next_attempt_at <= ? "
-        "ORDER BY next_attempt_at ASC LIMIT ?",
-        (now, limit),
-    ).fetchall()
+def claim_due(conn: sqlite3.Connection, *, now: datetime, limit: int = 10) -> list[PendingJobRow]:
+    rows = conn.execute(_SQL_CLAIM_DUE, (now, limit)).fetchall()
     return [_row_to_job(r) for r in rows]
 
 

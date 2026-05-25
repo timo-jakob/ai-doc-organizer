@@ -1,9 +1,9 @@
 """Verify the pipeline falls back to OCR when pypdf returns NO_TEXT."""
+
 from __future__ import annotations
 
 import threading
-from datetime import date, datetime, timezone
-from pathlib import Path
+from datetime import UTC, date, datetime
 from unittest.mock import patch
 
 import pytest
@@ -49,8 +49,10 @@ def setup(tmp_path):
         create_category(conn, slug="_review", display_name="_review", is_review=True)
         create_doctype(conn, slug="rechnung", display_name="Rechnung")
         mctx = MutationContext(
-            conn=conn, archive_root=archive, lock=threading.Lock(),
-            now=lambda: datetime(2026, 5, 17, 10, tzinfo=timezone.utc),
+            conn=conn,
+            archive_root=archive,
+            lock=threading.Lock(),
+            now=lambda: datetime(2026, 5, 17, 10, tzinfo=UTC),
         )
         yield {"conn": conn, "archive": archive, "mctx": mctx, "tmp": tmp_path}
 
@@ -77,7 +79,8 @@ def test_pipeline_uses_ocr_when_pypdf_returns_no_text(setup):
         outcome = pipe.process(pdf)
 
     assert outcome is PipelineOutcome.AUTO_FILED
-    from aido.pdf.hash import sha256_of_file  # noqa: E402
+    from aido.pdf.hash import sha256_of_file
+
     # File has been moved to archive; we can't hash inbox path anymore
     moved = list(setup["archive"].rglob("*.pdf"))
     assert len(moved) == 1

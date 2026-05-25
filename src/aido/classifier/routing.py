@@ -1,9 +1,10 @@
 """Slug resolution + auto-file/review decision."""
+
 from __future__ import annotations
 
 import sqlite3
 from dataclasses import dataclass
-from enum import Enum
+from enum import StrEnum
 
 from aido.store.persons import get_person_by_slug
 from aido.store.taxonomy import (
@@ -16,7 +17,7 @@ from aido.types import ClassificationResult, RouteOutcome
 _DOCTYPE_FALLBACK_SLUG = "letter"
 
 
-class RouteReason(str, Enum):
+class RouteReason(StrEnum):
     LOW_CONFIDENCE = "low_confidence"
     NEW_CATEGORY_PROPOSAL = "new_category_proposal"
     UNKNOWN_PERSON = "unknown_person"

@@ -1,5 +1,5 @@
 import threading
-from datetime import date, datetime, timezone
+from datetime import UTC, date, datetime
 from pathlib import Path
 
 import pytest
@@ -28,7 +28,7 @@ def web(tmp_path):
     with connect(db) as conn:
         init_db(conn)
         timo = create_person(conn, slug="timo", display_name="Timo")
-        anna = create_person(conn, slug="anna", display_name="Anna")
+        _anna = create_person(conn, slug="anna", display_name="Anna")
         cat = create_category(conn, slug="rechnungen", display_name="Rechnungen")
         create_category(conn, slug="steuer", display_name="Steuer")
         create_category(conn, slug="_review", display_name="_review", is_review=True)
@@ -36,17 +36,29 @@ def web(tmp_path):
         filed = archive / "timo" / "rechnungen" / "x.pdf"
         filed.parent.mkdir(parents=True)
         filed.write_bytes(b"%PDF-1.4")
-        new_id = insert_decision(conn, NewDecision(
-            created_at=datetime(2026, 5, 17, 10, tzinfo=timezone.utc),
-            source_hash="h1", source_path="/s/x.pdf", filed_path=str(filed),
-            person_id=timo.id, category_id=cat.id, doctype_id=dt.id,
-            document_date=date(2026, 3, 12), counterparty="telekom",
-            proposed_filename="x.pdf",
-            overall_confidence=0.93, person_confidence=0.95, category_confidence=0.91,
-            reasoning="r", classifier_model="m",
-            new_category_proposal=None, needs_review=False,
-            status=DecisionStatus.AUTO_FILED,
-        ))
+        new_id = insert_decision(
+            conn,
+            NewDecision(
+                created_at=datetime(2026, 5, 17, 10, tzinfo=UTC),
+                source_hash="h1",
+                source_path="/s/x.pdf",
+                filed_path=str(filed),
+                person_id=timo.id,
+                category_id=cat.id,
+                doctype_id=dt.id,
+                document_date=date(2026, 3, 12),
+                counterparty="telekom",
+                proposed_filename="x.pdf",
+                overall_confidence=0.93,
+                person_confidence=0.95,
+                category_confidence=0.91,
+                reasoning="r",
+                classifier_model="m",
+                new_category_proposal=None,
+                needs_review=False,
+                status=DecisionStatus.AUTO_FILED,
+            ),
+        )
     # Connection used by WebState — keep open for the duration of the test.
     state_conn_ctx = connect(db)
     conn = state_conn_ctx.__enter__()
@@ -57,23 +69,27 @@ def web(tmp_path):
             conn=conn,
             archive_root=archive,
             lock=threading.Lock(),
-            now=lambda: datetime(2026, 5, 17, 12, tzinfo=timezone.utc),
+            now=lambda: datetime(2026, 5, 17, 12, tzinfo=UTC),
         ),
         health=HealthState(),
     )
     app = create_app(state)
-    app.config["TESTING"] = True
+    # nosemgrep: python.flask.security.audit.hardcoded-config.avoid_hardcoded_config_TESTING
+    app.config["TESTING"] = True  # required by Flask's test client; this is a test fixture
     yield app.test_client(), new_id
     state_conn_ctx.__exit__(None, None, None)
 
 
 def test_post_refile_moves_and_audits(web):
     client, decision_id = web
-    rv = client.post(f"/decisions/{decision_id}/re-file", json={
-        "person_slug": "anna",
-        "category_slug": "steuer",
-        "filename": "moved.pdf",
-    })
+    rv = client.post(
+        f"/decisions/{decision_id}/re-file",
+        json={
+            "person_slug": "anna",
+            "category_slug": "steuer",
+            "filename": "moved.pdf",
+        },
+    )
     assert rv.status_code == 200
     assert rv.get_json() == {"ok": True}
     state = client.application.config["AIDO_STATE"]
@@ -104,21 +120,29 @@ def test_post_delete(web):
 def test_post_promote_category_creates_and_refiles(web):
     client, decision_id = web
     state = client.application.config["AIDO_STATE"]
-    rv = client.post(f"/decisions/{decision_id}/promote-category", json={
-        "new_category_slug": "garten",
-        "new_category_display_name": "Garten",
-        "person_slug": "timo",
-        "filename": "garten_doc.pdf",
-    })
+    rv = client.post(
+        f"/decisions/{decision_id}/promote-category",
+        json={
+            "new_category_slug": "garten",
+            "new_category_display_name": "Garten",
+            "person_slug": "timo",
+            "filename": "garten_doc.pdf",
+        },
+    )
     assert rv.status_code == 200
     assert get_category_by_slug(state.mutations.conn, "garten") is not None
 
 
 def test_unknown_decision_returns_404(web):
     client, _ = web
-    rv = client.post("/decisions/9999/re-file", json={
-        "person_slug": "anna", "category_slug": "steuer", "filename": "x.pdf",
-    })
+    rv = client.post(
+        "/decisions/9999/re-file",
+        json={
+            "person_slug": "anna",
+            "category_slug": "steuer",
+            "filename": "x.pdf",
+        },
+    )
     assert rv.status_code == 404
 
 
@@ -128,9 +152,14 @@ def test_refile_when_file_missing_returns_404(web):
     d = get_decision(state.mutations.conn, decision_id)
     # Delete the filed PDF on disk
     Path(d.filed_path).unlink()
-    rv = client.post(f"/decisions/{decision_id}/re-file", json={
-        "person_slug": "anna", "category_slug": "steuer", "filename": "x.pdf",
-    })
+    rv = client.post(
+        f"/decisions/{decision_id}/re-file",
+        json={
+            "person_slug": "anna",
+            "category_slug": "steuer",
+            "filename": "x.pdf",
+        },
+    )
     assert rv.status_code == 404
 
 

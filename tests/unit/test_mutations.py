@@ -1,5 +1,5 @@
 import threading
-from datetime import date, datetime, timezone
+from datetime import UTC, date, datetime
 from pathlib import Path
 
 import pytest
@@ -44,7 +44,7 @@ def ctx(tmp_path):
         new_id = insert_decision(
             conn,
             NewDecision(
-                created_at=datetime(2026, 5, 17, 10, tzinfo=timezone.utc),
+                created_at=datetime(2026, 5, 17, 10, tzinfo=UTC),
                 source_hash="h1",
                 source_path="/scans/scan001.pdf",
                 filed_path=str(filed),
@@ -64,8 +64,12 @@ def ctx(tmp_path):
                 status=DecisionStatus.AUTO_FILED,
             ),
         )
-        mctx = MutationContext(conn=conn, archive_root=archive, lock=threading.Lock(),
-                               now=lambda: datetime(2026, 5, 17, 11, tzinfo=timezone.utc))
+        mctx = MutationContext(
+            conn=conn,
+            archive_root=archive,
+            lock=threading.Lock(),
+            now=lambda: datetime(2026, 5, 17, 11, tzinfo=UTC),
+        )
         yield {
             "ctx": mctx,
             "decision_id": new_id,

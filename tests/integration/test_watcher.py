@@ -1,8 +1,6 @@
 import time
 from pathlib import Path
 
-import pytest
-
 from aido.worker.queue import InboxQueue
 from aido.worker.watcher import InboxWatcher
 
@@ -24,8 +22,9 @@ def test_watcher_picks_up_new_pdf(tmp_path: Path):
         # Drop a PDF after the watcher is running.
         target = tmp_path / "new.pdf"
         target.write_bytes(b"%PDF-1.4\n%fake\n")
-        assert _wait_for(lambda: q.get(timeout=0.1) is not None or False, timeout=4.0) or \
-            _wait_for(lambda: target.exists() and q._q.qsize() >= 1, timeout=4.0)  # type: ignore[attr-defined]
+        assert _wait_for(lambda: q.get(timeout=0.1) is not None or False, timeout=4.0) or _wait_for(
+            lambda: target.exists() and q._q.qsize() >= 1, timeout=4.0
+        )  # type: ignore[attr-defined]
     finally:
         watcher.stop()
 

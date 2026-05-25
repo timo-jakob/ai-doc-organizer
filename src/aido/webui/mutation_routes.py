@@ -1,4 +1,5 @@
 """POST endpoints that call into aido.mutations under the daemon's lock."""
+
 from __future__ import annotations
 
 from pathlib import Path

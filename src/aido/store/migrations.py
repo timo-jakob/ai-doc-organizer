@@ -1,8 +1,9 @@
 """DDL bootstrap. v1 has exactly one schema version."""
+
 from __future__ import annotations
 
 import sqlite3
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 
 SCHEMA_VERSION = 1
@@ -19,12 +20,10 @@ def init_db(conn: sqlite3.Connection) -> None:
             conn.executescript(_SCHEMA_PATH.read_text(encoding="utf-8"))
             conn.execute(
                 "INSERT INTO schema_version(version, applied_at) VALUES (?, ?)",
-                (SCHEMA_VERSION, datetime.now(timezone.utc).isoformat()),
+                (SCHEMA_VERSION, datetime.now(UTC).isoformat()),
             )
         return
     # Already initialised; ensure version row matches expectation.
     current = conn.execute("SELECT MAX(version) FROM schema_version").fetchone()[0]
     if current != SCHEMA_VERSION:
-        raise RuntimeError(
-            f"Unsupported schema version {current!r}; expected {SCHEMA_VERSION}"
-        )
+        raise RuntimeError(f"Unsupported schema version {current!r}; expected {SCHEMA_VERSION}")

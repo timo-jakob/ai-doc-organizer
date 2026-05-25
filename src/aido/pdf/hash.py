@@ -1,4 +1,5 @@
 """SHA-256 of a file on disk, streaming so big files don't blow memory."""
+
 from __future__ import annotations
 
 import hashlib

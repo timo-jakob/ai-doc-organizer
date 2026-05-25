@@ -1,0 +1,45 @@
+# Trivy config — used by both vulnerability and license scans on the
+# filesystem (deps in lockfiles) and on the built container image.
+
+severity:
+  - CRITICAL
+  - HIGH
+
+vulnerability:
+  ignore-unfixed: false
+
+scan:
+  scanners:
+    - vuln
+    - secret
+    - misconfig
+    - license
+
+# License policy. Trivy ships sensible defaults — AGPL/SSPL are forbidden
+# (HIGH severity → blocks CI), GPL/LGPL are restricted (MEDIUM → reported
+# but doesn't fail by default).
+license:
+  full: false
+  confidence-level: 0.9
+  # GPL/LGPL show up in distro packages (libxml2, libgnutls30, etc.)
+  # baked into the python:3.13-slim base image. Since this project is
+  # MIT-licensed and uses these packages via OS dynamic linking (not
+  # statically embedding them in a derivative), we don't take on their
+  # copyleft obligations. Mark them as ignored so license-image scan
+  # doesn't fail CI on transitive distro licenses.
+  ignored:
+    - GPL-2.0-only
+    - GPL-2.0-or-later
+    - GPL-3.0-only
+    - GPL-3.0-or-later
+    - LGPL-2.0-only
+    - LGPL-2.0-or-later
+    - LGPL-2.1-only
+    - LGPL-2.1-or-later
+    - LGPL-3.0-only
+    - LGPL-3.0-or-later
+
+format: table
+exit-code: 1
+
+ignore-policy: ""

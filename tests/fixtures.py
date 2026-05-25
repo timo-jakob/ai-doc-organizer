@@ -2,10 +2,11 @@
 
 Uses fpdf2 (dev dep) so we don't ship binary fixtures in the repo.
 """
+
 from __future__ import annotations
 
+from collections.abc import Sequence
 from pathlib import Path
-from typing import Sequence
 
 from fpdf import FPDF
 

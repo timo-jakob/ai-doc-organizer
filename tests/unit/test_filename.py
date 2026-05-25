@@ -49,9 +49,10 @@ def test_next_available_name_multiple_collisions(tmp_path: Path):
     for i in (None, 2, 3):
         suffix = "" if i is None else f"_{i}"
         (tmp_path / f"2026-03-12_rechnung_telekom{suffix}.pdf").touch()
-    assert next_available_name(
-        tmp_path / "2026-03-12_rechnung_telekom.pdf"
-    ) == tmp_path / "2026-03-12_rechnung_telekom_4.pdf"
+    assert (
+        next_available_name(tmp_path / "2026-03-12_rechnung_telekom.pdf")
+        == tmp_path / "2026-03-12_rechnung_telekom_4.pdf"
+    )
 
 
 def test_next_available_name_gives_up_eventually(tmp_path: Path):

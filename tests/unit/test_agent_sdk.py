@@ -1,4 +1,3 @@
-import asyncio
 import json
 from datetime import date
 
@@ -17,15 +16,23 @@ def taxonomy_conn(tmp_path):
         init_db(c)
         timo = create_person(c, slug="timo", display_name="Timo Jakob")
         anna = create_person(c, slug="anna", display_name="Anna Jakob")
-        shared = create_person(c, slug="shared", display_name="Shared", is_shared=True)
+        create_person(c, slug="shared", display_name="Shared", is_shared=True)
         for alias in ("Timo Jakob", "T. Jakob", "Jakob"):
             add_alias(c, person_id=timo.id, alias=alias)
         add_alias(c, person_id=anna.id, alias="Anna Jakob")
-        create_category(c, slug="rechnungen", display_name="Rechnungen",
-                        description="Eingehende Rechnungen aller Art")
+        create_category(
+            c,
+            slug="rechnungen",
+            display_name="Rechnungen",
+            description="Eingehende Rechnungen aller Art",
+        )
         create_category(c, slug="_review", display_name="_review", is_review=True)
-        create_doctype(c, slug="rechnung", display_name="Rechnung",
-                       description="Eine Rechnung von einem Anbieter")
+        create_doctype(
+            c,
+            slug="rechnung",
+            display_name="Rechnung",
+            description="Eine Rechnung von einem Anbieter",
+        )
         create_doctype(c, slug="letter", display_name="Brief")
         yield c
 
@@ -57,9 +64,7 @@ def test_classify_parses_valid_json_response(taxonomy_conn, mocker):
         "new_category_proposal": None,
         "reasoning": "Recipient Timo Jakob; sender Telekom",
     }
-    fake_response_text = (
-        "<classification>\n" + json.dumps(payload) + "\n</classification>\n"
-    )
+    fake_response_text = "<classification>\n" + json.dumps(payload) + "\n</classification>\n"
 
     async def fake_query(prompt, options):
         yield _text_block(fake_response_text)
@@ -86,8 +91,13 @@ def test_classify_raises_on_no_classification_tag(taxonomy_conn, mocker):
 
 def _text_block(text: str):
     """Mimics the Agent SDK's text block shape."""
+
     class _T:
-        def __init__(self, t): self.text = t
+        def __init__(self, t):
+            self.text = t
+
     class _M:
-        def __init__(self, t): self.content = [_T(t)]
+        def __init__(self, t):
+            self.content = [_T(t)]
+
     return _M(text)

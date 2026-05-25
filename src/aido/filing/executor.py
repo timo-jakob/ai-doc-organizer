@@ -1,4 +1,5 @@
 """Atomic move of a PDF into the archive under <person>/<category>/."""
+
 from __future__ import annotations
 
 import os

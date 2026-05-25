@@ -5,12 +5,13 @@ Subcommands:
 - status: print health + counts.
 - rebuild-index: scan the archive directory and reconcile decisions table.
 """
+
 from __future__ import annotations
 
 import argparse
 import sys
+from collections.abc import Sequence
 from pathlib import Path
-from typing import Sequence
 
 from ruamel.yaml import YAML
 
@@ -55,10 +56,8 @@ def main(argv: Sequence[str] | None = None) -> int:
     p_init = sub.add_parser("init", help="bootstrap the DB and archive folders")
     p_init.add_argument("--db", type=Path, required=True)
     p_init.add_argument("--seed", type=Path, help="YAML seed file (non-interactive)")
-    p_init.add_argument("--archive-root", type=Path,
-                        help="create this directory if missing")
-    p_init.add_argument("--scan-inbox", type=Path,
-                        help="create this directory if missing")
+    p_init.add_argument("--archive-root", type=Path, help="create this directory if missing")
+    p_init.add_argument("--scan-inbox", type=Path, help="create this directory if missing")
 
     p_status = sub.add_parser("status", help="print health and queue counts")
     p_status.add_argument("--db", type=Path, required=True)
@@ -98,9 +97,7 @@ def _cmd_init(args: argparse.Namespace) -> int:
         # Ensure the _review category always exists.
         if get_category_by_slug(conn, "_review") is None:
             with conn:
-                create_category(
-                    conn, slug="_review", display_name="_review", is_review=True
-                )
+                create_category(conn, slug="_review", display_name="_review", is_review=True)
         # Apply defaults for any missing categories/doctypes (no overwrite).
         with conn:
             for slug, name, desc in _DEFAULT_CATEGORIES:
@@ -115,6 +112,7 @@ def _cmd_init(args: argparse.Namespace) -> int:
 
 def _cmd_status(args: argparse.Namespace) -> int:
     from aido.store.decisions import count_needs_review
+
     with connect(args.db) as conn:
         n = count_needs_review(conn)
     print(f"needs_review: {n}")
@@ -159,8 +157,10 @@ def _seed_from_yaml(conn, seed_path: Path) -> None:
 
 
 def _seed_interactive(conn) -> None:
-    print("Interactive init: configure four family members + a shared bucket.\n"
-          "You can run this again later, or use --seed seed.yaml for non-interactive setup.")
+    print(
+        "Interactive init: configure four family members + a shared bucket.\n"
+        "You can run this again later, or use --seed seed.yaml for non-interactive setup."
+    )
     with conn:
         for i in range(1, 5):
             slug = input(f"Person {i} slug (e.g. 'timo'): ").strip()

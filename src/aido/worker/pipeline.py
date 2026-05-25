@@ -3,13 +3,14 @@
 Catches every exception. Never raises out of `process()`. Returns a
 `PipelineOutcome` describing what happened, so callers can log it.
 """
+
 from __future__ import annotations
 
 import logging
 import sqlite3
 import time
-from datetime import datetime, timezone
-from enum import Enum
+from datetime import UTC, datetime
+from enum import StrEnum
 from pathlib import Path
 
 from aido.classifier.base import Classifier
@@ -17,8 +18,8 @@ from aido.classifier.routing import RouteDecision, route
 from aido.filing.executor import FilingTarget, file_document
 from aido.mutations import MutationContext
 from aido.pdf.extract import ExtractStatus, extract_text
-from aido.pdf.ocr import OcrStatus, ocr_text
 from aido.pdf.hash import sha256_of_file
+from aido.pdf.ocr import OcrStatus, ocr_text
 from aido.store.decisions import NewDecision, find_by_source_hash, insert_decision
 from aido.store.persons import get_person_by_slug
 from aido.store.taxonomy import get_review_category
@@ -31,7 +32,7 @@ from aido.types import (
 _log = logging.getLogger("aido.pipeline")
 
 
-class PipelineOutcome(str, Enum):
+class PipelineOutcome(StrEnum):
     AUTO_FILED = "auto_filed"
     REVIEW = "review"
     DUPLICATE_SKIP = "duplicate_skip"
@@ -152,9 +153,7 @@ class Pipeline:
         except FileNotFoundError:
             return
 
-    def _build_target(
-        self, decision: RouteDecision, result: ClassificationResult
-    ) -> FilingTarget:
+    def _build_target(self, decision: RouteDecision, result: ClassificationResult) -> FilingTarget:
         if decision.outcome is RouteOutcome.AUTO_FILE:
             assert decision.person_id is not None
             assert decision.category_id is not None
@@ -183,16 +182,11 @@ class Pipeline:
         """
         review_cat = get_review_category(self._conn)
         assert review_cat is not None, "DB missing _review category"
-        filename = (
-            f"{datetime.now(timezone.utc).date().isoformat()}"
-            f"_uncertain_{source_hash[:8]}.pdf"
-        )
+        filename = f"{datetime.now(UTC).date().isoformat()}_uncertain_{source_hash[:8]}.pdf"
         dest = file_document(
             src,
             archive_root=self._mutations.archive_root,
-            target=FilingTarget(
-                person_slug=None, category_slug=review_cat.slug, filename=filename
-            ),
+            target=FilingTarget(person_slug=None, category_slug=review_cat.slug, filename=filename),
         )
         # Need a person_id to satisfy FK; use 'shared' if it exists, else any active person.
         person = get_person_by_slug(self._conn, "shared") or self._any_person()
@@ -281,9 +275,7 @@ class Pipeline:
             )
 
     def _slug_of_person(self, person_id: int) -> str:
-        row = self._conn.execute(
-            "SELECT slug FROM persons WHERE id = ?", (person_id,)
-        ).fetchone()
+        row = self._conn.execute("SELECT slug FROM persons WHERE id = ?", (person_id,)).fetchone()
         assert row is not None
         return row["slug"]
 

@@ -2,7 +2,7 @@ from datetime import date
 
 import pytest
 
-from aido.classifier.routing import RouteDecision, RouteReason, route
+from aido.classifier.routing import RouteReason, route
 from aido.store.connection import connect
 from aido.store.migrations import init_db
 from aido.store.persons import create_person
@@ -24,19 +24,19 @@ def conn(tmp_path):
 
 
 def _r(**over):
-    base = dict(
-        person_slug="timo",
-        category_slug="rechnungen",
-        doctype_slug="rechnung",
-        document_date=date(2026, 3, 12),
-        counterparty="telekom",
-        proposed_filename="2026-03-12_rechnung_telekom.pdf",
-        overall_confidence=0.93,
-        person_confidence=0.95,
-        category_confidence=0.91,
-        new_category_proposal=None,
-        reasoning="x",
-    )
+    base = {
+        "person_slug": "timo",
+        "category_slug": "rechnungen",
+        "doctype_slug": "rechnung",
+        "document_date": date(2026, 3, 12),
+        "counterparty": "telekom",
+        "proposed_filename": "2026-03-12_rechnung_telekom.pdf",
+        "overall_confidence": 0.93,
+        "person_confidence": 0.95,
+        "category_confidence": 0.91,
+        "new_category_proposal": None,
+        "reasoning": "x",
+    }
     base.update(over)
     return ClassificationResult(**base)
 
