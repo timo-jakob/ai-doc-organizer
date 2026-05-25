@@ -13,6 +13,14 @@ _COLS = (
     "before_person_id, after_person_id, before_category_id, after_category_id, "
     "created_at AS 'created_at [DATETIME]', note"
 )
+# Adjacent-string-literal concatenation — no runtime `+`/f-string for the
+# linters to flag. All variable inputs flow through `?` placeholders.
+_SQL_LIST_ACTIONS_FOR_DECISION = (
+    "SELECT id, decision_id, action, before_path, after_path, "
+    "before_person_id, after_person_id, before_category_id, after_category_id, "
+    "created_at AS 'created_at [DATETIME]', note "
+    "FROM manual_actions WHERE decision_id = ? ORDER BY created_at ASC"
+)
 
 
 @dataclass(frozen=True, slots=True)
@@ -84,8 +92,5 @@ def insert_manual_action(conn: sqlite3.Connection, a: NewManualAction) -> int:
 
 
 def list_actions_for_decision(conn: sqlite3.Connection, decision_id: int) -> list[ManualActionRow]:
-    rows = conn.execute(
-        f"SELECT {_COLS} FROM manual_actions WHERE decision_id = ? ORDER BY created_at ASC",
-        (decision_id,),
-    ).fetchall()
+    rows = conn.execute(_SQL_LIST_ACTIONS_FOR_DECISION, (decision_id,)).fetchall()
     return [_row_to_action(r) for r in rows]
