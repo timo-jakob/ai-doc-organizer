@@ -76,11 +76,16 @@ def get_person_by_slug(conn: sqlite3.Connection, slug: str) -> PersonRow | None:
     return _row_to_person(row) if row else None
 
 
+_LIST_PERSONS_ACTIVE = (
+    "SELECT id, slug, display_name, is_shared, is_active FROM persons "
+    "WHERE is_active = 1 ORDER BY slug"
+)
+_LIST_PERSONS_ALL = "SELECT id, slug, display_name, is_shared, is_active FROM persons ORDER BY slug"
+
+
 def list_persons(conn: sqlite3.Connection, *, include_inactive: bool = False) -> list[PersonRow]:
-    where = "" if include_inactive else "WHERE is_active = 1"
-    rows = conn.execute(
-        f"SELECT id, slug, display_name, is_shared, is_active FROM persons {where} ORDER BY slug"
-    ).fetchall()
+    sql = _LIST_PERSONS_ALL if include_inactive else _LIST_PERSONS_ACTIVE
+    rows = conn.execute(sql).fetchall()
     return [_row_to_person(r) for r in rows]
 
 

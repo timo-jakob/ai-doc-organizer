@@ -16,6 +16,45 @@ _COLS = (
     "reasoning, classifier_model, new_category_proposal, "
     "needs_review, status"
 )
+# Each query below uses adjacent-string-literal concatenation (compile-time)
+# rather than runtime `+` so ruff S608 and semgrep's raw-query rules don't
+# misfire. All variable inputs flow through `?` placeholders.
+_SQL_GET_DECISION = (
+    "SELECT id, created_at AS 'created_at [DATETIME]', source_hash, source_path, filed_path, "
+    "person_id, category_id, doctype_id, "
+    "document_date AS 'document_date [DATE]', counterparty, proposed_filename, "
+    "overall_confidence, person_confidence, category_confidence, "
+    "reasoning, classifier_model, new_category_proposal, "
+    "needs_review, status "
+    "FROM decisions WHERE id = ?"
+)
+_SQL_FIND_BY_SOURCE_HASH = (
+    "SELECT id, created_at AS 'created_at [DATETIME]', source_hash, source_path, filed_path, "
+    "person_id, category_id, doctype_id, "
+    "document_date AS 'document_date [DATE]', counterparty, proposed_filename, "
+    "overall_confidence, person_confidence, category_confidence, "
+    "reasoning, classifier_model, new_category_proposal, "
+    "needs_review, status "
+    "FROM decisions WHERE source_hash = ?"
+)
+_SQL_LIST_RECENT_REVIEW = (
+    "SELECT id, created_at AS 'created_at [DATETIME]', source_hash, source_path, filed_path, "
+    "person_id, category_id, doctype_id, "
+    "document_date AS 'document_date [DATE]', counterparty, proposed_filename, "
+    "overall_confidence, person_confidence, category_confidence, "
+    "reasoning, classifier_model, new_category_proposal, "
+    "needs_review, status "
+    "FROM decisions WHERE needs_review = 1 ORDER BY created_at DESC LIMIT ?"
+)
+_SQL_LIST_RECENT_ALL = (
+    "SELECT id, created_at AS 'created_at [DATETIME]', source_hash, source_path, filed_path, "
+    "person_id, category_id, doctype_id, "
+    "document_date AS 'document_date [DATE]', counterparty, proposed_filename, "
+    "overall_confidence, person_confidence, category_confidence, "
+    "reasoning, classifier_model, new_category_proposal, "
+    "needs_review, status "
+    "FROM decisions ORDER BY created_at DESC LIMIT ?"
+)
 
 
 @dataclass(frozen=True)
@@ -134,14 +173,12 @@ def insert_decision(conn: sqlite3.Connection, d: NewDecision) -> int:
 
 
 def get_decision(conn: sqlite3.Connection, decision_id: int) -> DecisionRow | None:
-    row = conn.execute(f"SELECT {_COLS} FROM decisions WHERE id = ?", (decision_id,)).fetchone()
+    row = conn.execute(_SQL_GET_DECISION, (decision_id,)).fetchone()
     return _row_to_decision(row) if row else None
 
 
 def find_by_source_hash(conn: sqlite3.Connection, source_hash: str) -> DecisionRow | None:
-    row = conn.execute(
-        f"SELECT {_COLS} FROM decisions WHERE source_hash = ?", (source_hash,)
-    ).fetchone()
+    row = conn.execute(_SQL_FIND_BY_SOURCE_HASH, (source_hash,)).fetchone()
     return _row_to_decision(row) if row else None
 
 
@@ -151,11 +188,8 @@ def list_recent(
     limit: int = 50,
     needs_review_only: bool = False,
 ) -> list[DecisionRow]:
-    where = "WHERE needs_review = 1 " if needs_review_only else ""
-    rows = conn.execute(
-        f"SELECT {_COLS} FROM decisions {where}ORDER BY created_at DESC LIMIT ?",
-        (limit,),
-    ).fetchall()
+    sql = _SQL_LIST_RECENT_REVIEW if needs_review_only else _SQL_LIST_RECENT_ALL
+    rows = conn.execute(sql, (limit,)).fetchall()
     return [_row_to_decision(r) for r in rows]
 
 
@@ -191,4 +225,10 @@ def update_decision(conn: sqlite3.Connection, decision_id: int, update: Decision
     if not sets:
         return
     params.append(decision_id)
-    conn.execute(f"UPDATE decisions SET {', '.join(sets)} WHERE id = ?", params)
+    # `sets` contains only literal `col = ?` fragments built from the kwarg
+    # checks above; all values flow through `?` placeholders in `params`.
+    # ruff S608 fires on the runtime concat — annotation justified because
+    # the dynamic part is server-built fragments, not user input.
+    sql = "UPDATE decisions SET " + ", ".join(sets) + " WHERE id = ?"  # noqa: S608
+    # nosemgrep: python.sqlalchemy.security.sqlalchemy-execute-raw-query.sqlalchemy-execute-raw-query
+    conn.execute(sql, params)

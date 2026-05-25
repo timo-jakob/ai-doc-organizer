@@ -63,7 +63,8 @@ def web(tmp_path):
         health=HealthState(),
     )
     app = create_app(state)
-    app.config["TESTING"] = True
+    # nosemgrep: python.flask.security.audit.hardcoded-config.avoid_hardcoded_config_TESTING
+    app.config["TESTING"] = True  # required by Flask's test client; this is a test fixture
     return app.test_client(), new_id, filed
 
 
@@ -83,7 +84,7 @@ def test_detail_404_for_unknown(web):
 
 
 def test_pdf_route_streams_bytes(web):
-    client, new_id, filed = web
+    client, new_id, _filed = web
     rv = client.get(f"/pdf/{new_id}")
     assert rv.status_code == 200
     assert rv.mimetype == "application/pdf"

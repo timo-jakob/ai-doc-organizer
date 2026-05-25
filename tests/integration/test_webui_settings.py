@@ -40,7 +40,8 @@ def web(tmp_path):
         health=HealthState(),
     )
     app = create_app(state)
-    app.config["TESTING"] = True
+    # nosemgrep: python.flask.security.audit.hardcoded-config.avoid_hardcoded_config_TESTING
+    app.config["TESTING"] = True  # required by Flask's test client; this is a test fixture
     yield app.test_client(), conn
     state_conn_ctx.__exit__(None, None, None)
 
