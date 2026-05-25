@@ -1,4 +1,5 @@
 """PDF text extraction using pypdf, with a tri-state outcome."""
+
 from __future__ import annotations
 
 from enum import Enum

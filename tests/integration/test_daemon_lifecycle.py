@@ -1,7 +1,6 @@
 # tests/integration/test_daemon_lifecycle.py
 import time
 from datetime import date
-from pathlib import Path
 
 import pytest
 
@@ -72,6 +71,7 @@ def test_daemon_files_a_pdf_dropped_in_inbox(seeded):
         while time.monotonic() < deadline:
             with connect(seeded["db"]) as conn:
                 from aido.pdf.hash import sha256_of_file
+
                 if pdf.exists():
                     h = sha256_of_file(pdf)
                 else:

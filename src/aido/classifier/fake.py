@@ -1,7 +1,8 @@
 """A scriptable Classifier double for tests."""
+
 from __future__ import annotations
 
-from typing import Sequence
+from collections.abc import Sequence
 
 from aido.types import ClassificationResult
 

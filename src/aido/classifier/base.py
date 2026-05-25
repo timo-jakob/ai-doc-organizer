@@ -1,11 +1,12 @@
 """Classifier Protocol and re-export of ClassificationResult."""
+
 from __future__ import annotations
 
 from typing import Protocol, runtime_checkable
 
 from aido.types import ClassificationResult
 
-__all__ = ["Classifier", "ClassificationResult"]
+__all__ = ["ClassificationResult", "Classifier"]
 
 
 @runtime_checkable

@@ -1,4 +1,5 @@
 """Audit log of human-driven mutations."""
+
 from __future__ import annotations
 
 import sqlite3
@@ -67,21 +68,24 @@ def insert_manual_action(conn: sqlite3.Connection, a: NewManualAction) -> int:
         "  created_at, note"
         ") VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
         (
-            a.decision_id, a.action.value, a.before_path, a.after_path,
-            a.before_person_id, a.after_person_id,
-            a.before_category_id, a.after_category_id,
-            a.created_at, a.note,
+            a.decision_id,
+            a.action.value,
+            a.before_path,
+            a.after_path,
+            a.before_person_id,
+            a.after_person_id,
+            a.before_category_id,
+            a.after_category_id,
+            a.created_at,
+            a.note,
         ),
     )
     return cur.lastrowid
 
 
-def list_actions_for_decision(
-    conn: sqlite3.Connection, decision_id: int
-) -> list[ManualActionRow]:
+def list_actions_for_decision(conn: sqlite3.Connection, decision_id: int) -> list[ManualActionRow]:
     rows = conn.execute(
-        f"SELECT {_COLS} FROM manual_actions WHERE decision_id = ? "
-        "ORDER BY created_at ASC",
+        f"SELECT {_COLS} FROM manual_actions WHERE decision_id = ? ORDER BY created_at ASC",
         (decision_id,),
     ).fetchall()
     return [_row_to_action(r) for r in rows]

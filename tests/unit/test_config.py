@@ -15,7 +15,9 @@ def _write(p: Path, body: str) -> Path:
 
 
 def test_loads_valid_config(tmp_path: Path):
-    cfg_path = _write(tmp_path / "config.yaml", """
+    cfg_path = _write(
+        tmp_path / "config.yaml",
+        """
 archive_root: /archive
 scan_inbox: /scans
 db_path: /data/aido.sqlite
@@ -29,7 +31,8 @@ classifier:
 web:
   bind: 0.0.0.0
   port: 8765
-""".strip())
+""".strip(),
+    )
 
     cfg = load_config(cfg_path)
     assert isinstance(cfg, Config)
@@ -43,7 +46,9 @@ web:
 
 
 def test_unknown_backend_raises(tmp_path: Path):
-    cfg_path = _write(tmp_path / "config.yaml", """
+    cfg_path = _write(
+        tmp_path / "config.yaml",
+        """
 archive_root: /a
 scan_inbox: /s
 db_path: /d.sqlite
@@ -55,7 +60,8 @@ classifier:
 web:
   bind: 0.0.0.0
   port: 8765
-""".strip())
+""".strip(),
+    )
     with pytest.raises(ValueError, match="rocketship"):
         load_config(cfg_path)
 
@@ -67,7 +73,9 @@ def test_missing_required_key_raises(tmp_path: Path):
 
 
 def test_threshold_out_of_range_raises(tmp_path: Path):
-    cfg_path = _write(tmp_path / "config.yaml", """
+    cfg_path = _write(
+        tmp_path / "config.yaml",
+        """
 archive_root: /a
 scan_inbox: /s
 db_path: /d.sqlite
@@ -79,6 +87,7 @@ classifier:
 web:
   bind: 0.0.0.0
   port: 8765
-""".strip())
+""".strip(),
+    )
     with pytest.raises(ValueError, match="threshold"):
         load_config(cfg_path)

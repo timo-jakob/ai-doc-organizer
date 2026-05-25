@@ -3,6 +3,7 @@
 We pin to `PollingObserver` because the daemon runs in a Docker container on
 macOS where host bind-mounts do not emit inotify events.
 """
+
 from __future__ import annotations
 
 import logging
@@ -17,11 +18,7 @@ _log = logging.getLogger("aido.watcher")
 
 
 def _is_pdf(path: Path) -> bool:
-    return (
-        path.is_file()
-        and not path.name.startswith(".")
-        and path.suffix.lower() == ".pdf"
-    )
+    return path.is_file() and not path.name.startswith(".") and path.suffix.lower() == ".pdf"
 
 
 class _Handler(FileSystemEventHandler):

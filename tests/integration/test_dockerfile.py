@@ -1,4 +1,5 @@
 """Smoke test: build the image and curl /healthz inside the container."""
+
 from __future__ import annotations
 
 import os
@@ -21,21 +22,32 @@ def test_image_builds_and_healthz_responds(tmp_path: Path):
     tag = f"aido-test:{os.getpid()}"
     subprocess.run(
         [
-            "docker", "build",
-            "--build-arg", f"UID={os.getuid()}",
-            "--build-arg", f"GID={os.getgid()}",
-            "-t", tag, ".",
+            "docker",
+            "build",
+            "--build-arg",
+            f"UID={os.getuid()}",
+            "--build-arg",
+            f"GID={os.getgid()}",
+            "-t",
+            tag,
+            ".",
         ],
-        cwd=REPO_ROOT, check=True,
+        cwd=REPO_ROOT,
+        check=True,
     )
 
     # Prepare minimal mounts.
-    data = tmp_path / "data"; data.mkdir()
-    logs = tmp_path / "logs"; logs.mkdir()
-    archive = tmp_path / "archive"; archive.mkdir()
-    inbox = tmp_path / "inbox"; inbox.mkdir()
+    data = tmp_path / "data"
+    data.mkdir()
+    logs = tmp_path / "logs"
+    logs.mkdir()
+    archive = tmp_path / "archive"
+    archive.mkdir()
+    inbox = tmp_path / "inbox"
+    inbox.mkdir()
     cfg = tmp_path / "config.yaml"
-    cfg.write_text(f"""
+    cfg.write_text(
+        """
 archive_root: /archive
 scan_inbox: /scans
 db_path: /data/aido.sqlite
@@ -49,11 +61,14 @@ classifier:
 web:
   bind: 0.0.0.0
   port: 8765
-""".strip(), encoding="utf-8")
+""".strip(),
+        encoding="utf-8",
+    )
 
     # Seed an _review category etc. by running aido init inside the container.
     seed = tmp_path / "seed.yaml"
-    seed.write_text("""
+    seed.write_text(
+        """
 persons:
   - slug: timo
     display_name: Timo
@@ -68,19 +83,35 @@ categories:
 doctypes:
   - slug: rechnung
     display_name: Rechnung
-""".strip(), encoding="utf-8")
+""".strip(),
+        encoding="utf-8",
+    )
 
     init_args = [
-        "docker", "run", "--rm",
-        "-v", f"{cfg}:/app/config.yaml:ro",
-        "-v", f"{data}:/data",
-        "-v", f"{logs}:/var/log/aido",
-        "-v", f"{archive}:/archive",
-        "-v", f"{inbox}:/scans",
-        "-v", f"{seed}:/tmp/seed.yaml:ro",
+        "docker",
+        "run",
+        "--rm",
+        "-v",
+        f"{cfg}:/app/config.yaml:ro",
+        "-v",
+        f"{data}:/data",
+        "-v",
+        f"{logs}:/var/log/aido",
+        "-v",
+        f"{archive}:/archive",
+        "-v",
+        f"{inbox}:/scans",
+        "-v",
+        f"{seed}:/tmp/seed.yaml:ro",
         tag,
-        "python", "-m", "aido", "init",
-        "--db", "/data/aido.sqlite", "--seed", "/tmp/seed.yaml",
+        "python",
+        "-m",
+        "aido",
+        "init",
+        "--db",
+        "/data/aido.sqlite",
+        "--seed",
+        "/tmp/seed.yaml",
     ]
     subprocess.run(init_args, check=True)
 
@@ -88,13 +119,23 @@ doctypes:
     port = 18765
     name = f"aido-test-{os.getpid()}"
     run_args = [
-        "docker", "run", "-d", "--name", name,
-        "-p", f"127.0.0.1:{port}:8765",
-        "-v", f"{cfg}:/app/config.yaml:ro",
-        "-v", f"{data}:/data",
-        "-v", f"{logs}:/var/log/aido",
-        "-v", f"{archive}:/archive",
-        "-v", f"{inbox}:/scans",
+        "docker",
+        "run",
+        "-d",
+        "--name",
+        name,
+        "-p",
+        f"127.0.0.1:{port}:8765",
+        "-v",
+        f"{cfg}:/app/config.yaml:ro",
+        "-v",
+        f"{data}:/data",
+        "-v",
+        f"{logs}:/var/log/aido",
+        "-v",
+        f"{archive}:/archive",
+        "-v",
+        f"{inbox}:/scans",
         tag,
     ]
     subprocess.run(run_args, check=True)

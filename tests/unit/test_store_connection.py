@@ -31,8 +31,7 @@ def test_init_db_creates_all_tables(tmp_path: Path):
     with connect(tmp_path / "x.sqlite") as conn:
         init_db(conn)
         tables = {
-            row[0]
-            for row in conn.execute("SELECT name FROM sqlite_master WHERE type='table'")
+            row[0] for row in conn.execute("SELECT name FROM sqlite_master WHERE type='table'")
         }
     expected = {
         "persons",
@@ -57,6 +56,7 @@ def test_init_db_is_idempotent(tmp_path: Path):
 
 def test_check_constraint_rejects_bad_status(tmp_path: Path):
     import sqlite3
+
     with connect(tmp_path / "x.sqlite") as conn:
         init_db(conn)
         conn.execute(
@@ -76,7 +76,18 @@ def test_check_constraint_rejects_bad_status(tmp_path: Path):
                 "  needs_review, status"
                 ") VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)",
                 (
-                    "2026-05-17T10:00:00", "h", "/s", "/d", 1, 1, "x.pdf",
-                    0.9, 0.9, 0.9, "claude-opus-4-7", 0, "GARBAGE",
+                    "2026-05-17T10:00:00",
+                    "h",
+                    "/s",
+                    "/d",
+                    1,
+                    1,
+                    "x.pdf",
+                    0.9,
+                    0.9,
+                    0.9,
+                    "claude-opus-4-7",
+                    0,
+                    "GARBAGE",
                 ),
             )

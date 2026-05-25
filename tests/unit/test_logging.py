@@ -2,8 +2,6 @@ import json
 import logging
 from pathlib import Path
 
-import pytest
-
 from aido.logging_setup import JsonFormatter, configure_logging
 
 
@@ -47,10 +45,16 @@ def test_json_formatter_handles_exc_info():
         raise ValueError("boom")
     except ValueError:
         record = logging.LogRecord(
-            name="aido.test", level=logging.ERROR, pathname=__file__, lineno=1,
-            msg="oops", args=(), exc_info=True,
+            name="aido.test",
+            level=logging.ERROR,
+            pathname=__file__,
+            lineno=1,
+            msg="oops",
+            args=(),
+            exc_info=True,
         )
         import sys
+
         record.exc_info = sys.exc_info()
     obj = json.loads(JsonFormatter().format(record))
     assert "exc" in obj

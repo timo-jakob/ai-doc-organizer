@@ -4,15 +4,16 @@ Each function acquires `MutationContext.lock` for the duration of the call so
 that worker pipeline writes and HTTP-driven writes cannot race. All mutations
 write to `manual_actions` as part of the same transaction.
 """
+
 from __future__ import annotations
 
 import os
 import sqlite3
 import threading
+from collections.abc import Callable
 from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
-from typing import Callable
 
 from aido.filing.executor import FilingTarget, file_document
 from aido.filing.filename import next_available_name
@@ -46,9 +47,7 @@ def _person_slug_or_none(ctx: MutationContext, person_id: int | None) -> str | N
 
 
 def _category_slug(ctx: MutationContext, category_id: int) -> str:
-    row = ctx.conn.execute(
-        "SELECT slug FROM categories WHERE id = ?", (category_id,)
-    ).fetchone()
+    row = ctx.conn.execute("SELECT slug FROM categories WHERE id = ?", (category_id,)).fetchone()
     if row is None:
         raise ValueError(f"Unknown category id {category_id}")
     return row["slug"]
@@ -150,9 +149,7 @@ def rename(
         return dest
 
 
-def delete_decision(
-    ctx: MutationContext, decision_id: int, *, note: str | None = None
-) -> None:
+def delete_decision(ctx: MutationContext, decision_id: int, *, note: str | None = None) -> None:
     """Remove the filed PDF from disk and mark the decision FAILED."""
     with ctx.lock:
         d = get_decision(ctx.conn, decision_id)
@@ -184,9 +181,7 @@ def delete_decision(
             )
 
 
-def approve(
-    ctx: MutationContext, decision_id: int, *, note: str | None = None
-) -> None:
+def approve(ctx: MutationContext, decision_id: int, *, note: str | None = None) -> None:
     """Accept the classifier's decision: clear `needs_review`, mark AUTO_FILED."""
     with ctx.lock:
         d = get_decision(ctx.conn, decision_id)

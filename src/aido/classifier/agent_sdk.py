@@ -1,16 +1,18 @@
 """AgentSDKClassifier — v1 default, uses Max Plan via OAuth."""
+
 from __future__ import annotations
 
 import asyncio
 import json
 import re
 import sqlite3
+from collections.abc import AsyncIterator
 from datetime import date
-from typing import AsyncIterator
 
-from claude_agent_sdk import ClaudeAgentOptions, query as _claude_query
+from claude_agent_sdk import ClaudeAgentOptions
+from claude_agent_sdk import query as _claude_query
 
-from aido.store.persons import list_persons, list_aliases_for
+from aido.store.persons import list_aliases_for, list_persons
 from aido.store.taxonomy import list_categories, list_doctypes
 from aido.types import ClassificationResult
 
@@ -99,9 +101,7 @@ def _parse_response(raw: str) -> ClassificationResult:
             person_confidence=float(data["person_confidence"]),
             category_confidence=float(data["category_confidence"]),
             new_category_proposal=(
-                str(data["new_category_proposal"])
-                if data.get("new_category_proposal")
-                else None
+                str(data["new_category_proposal"]) if data.get("new_category_proposal") else None
             ),
             reasoning=str(data.get("reasoning") or ""),
         )

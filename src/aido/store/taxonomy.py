@@ -1,4 +1,5 @@
 """Categories + doctypes repository."""
+
 from __future__ import annotations
 
 import sqlite3
@@ -70,16 +71,12 @@ def create_category(
 
 
 def get_category_by_slug(conn: sqlite3.Connection, slug: str) -> CategoryRow | None:
-    row = conn.execute(
-        f"SELECT {_CAT_COLS} FROM categories WHERE slug = ?", (slug,)
-    ).fetchone()
+    row = conn.execute(f"SELECT {_CAT_COLS} FROM categories WHERE slug = ?", (slug,)).fetchone()
     return _row_to_category(row) if row else None
 
 
 def get_review_category(conn: sqlite3.Connection) -> CategoryRow | None:
-    row = conn.execute(
-        f"SELECT {_CAT_COLS} FROM categories WHERE is_review = 1 LIMIT 1"
-    ).fetchone()
+    row = conn.execute(f"SELECT {_CAT_COLS} FROM categories WHERE is_review = 1 LIMIT 1").fetchone()
     return _row_to_category(row) if row else None
 
 
@@ -87,9 +84,7 @@ def list_categories(
     conn: sqlite3.Connection, *, include_inactive: bool = False
 ) -> list[CategoryRow]:
     where = "" if include_inactive else "WHERE is_active = 1"
-    rows = conn.execute(
-        f"SELECT {_CAT_COLS} FROM categories {where} ORDER BY slug"
-    ).fetchall()
+    rows = conn.execute(f"SELECT {_CAT_COLS} FROM categories {where} ORDER BY slug").fetchall()
     return [_row_to_category(r) for r in rows]
 
 
@@ -102,28 +97,19 @@ def create_doctype(
     is_active: bool = True,
 ) -> DoctypeRow:
     cur = conn.execute(
-        "INSERT INTO doctypes(slug, display_name, description, is_active) "
-        "VALUES (?, ?, ?, ?)",
+        "INSERT INTO doctypes(slug, display_name, description, is_active) VALUES (?, ?, ?, ?)",
         (slug, display_name, description, int(is_active)),
     )
-    row = conn.execute(
-        f"SELECT {_DT_COLS} FROM doctypes WHERE id = ?", (cur.lastrowid,)
-    ).fetchone()
+    row = conn.execute(f"SELECT {_DT_COLS} FROM doctypes WHERE id = ?", (cur.lastrowid,)).fetchone()
     return _row_to_doctype(row)
 
 
 def get_doctype_by_slug(conn: sqlite3.Connection, slug: str) -> DoctypeRow | None:
-    row = conn.execute(
-        f"SELECT {_DT_COLS} FROM doctypes WHERE slug = ?", (slug,)
-    ).fetchone()
+    row = conn.execute(f"SELECT {_DT_COLS} FROM doctypes WHERE slug = ?", (slug,)).fetchone()
     return _row_to_doctype(row) if row else None
 
 
-def list_doctypes(
-    conn: sqlite3.Connection, *, include_inactive: bool = False
-) -> list[DoctypeRow]:
+def list_doctypes(conn: sqlite3.Connection, *, include_inactive: bool = False) -> list[DoctypeRow]:
     where = "" if include_inactive else "WHERE is_active = 1"
-    rows = conn.execute(
-        f"SELECT {_DT_COLS} FROM doctypes {where} ORDER BY slug"
-    ).fetchall()
+    rows = conn.execute(f"SELECT {_DT_COLS} FROM doctypes {where} ORDER BY slug").fetchall()
     return [_row_to_doctype(r) for r in rows]

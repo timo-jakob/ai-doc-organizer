@@ -1,4 +1,5 @@
 """AnthropicAPIClassifier — opportunistic fallback using direct API key."""
+
 from __future__ import annotations
 
 import logging
@@ -6,7 +7,7 @@ import sqlite3
 
 from anthropic import Anthropic
 
-from aido.classifier.agent_sdk import _parse_response, _build_user_prompt, build_system_prompt
+from aido.classifier.agent_sdk import _build_user_prompt, _parse_response, build_system_prompt
 from aido.types import ClassificationResult
 
 _log = logging.getLogger("aido.classifier.anthropic_api")

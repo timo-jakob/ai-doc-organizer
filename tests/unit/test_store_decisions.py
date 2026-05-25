@@ -1,4 +1,4 @@
-from datetime import date, datetime, timezone
+from datetime import UTC, date, datetime
 
 import pytest
 
@@ -33,7 +33,7 @@ def ctx(tmp_path):
 
 def _sample(p_id: int, c_id: int, d_id: int | None, *, source_hash: str = "h1") -> NewDecision:
     return NewDecision(
-        created_at=datetime(2026, 5, 17, 10, 0, tzinfo=timezone.utc),
+        created_at=datetime(2026, 5, 17, 10, 0, tzinfo=UTC),
         source_hash=source_hash,
         source_path="/scans/scan001.pdf",
         filed_path="/archive/timo/rechnungen/2026-03-12_rechnung_telekom.pdf",
@@ -84,7 +84,7 @@ def test_list_recent_orders_descending(ctx):
     conn, p, cat, dt, _ = ctx
     a = _sample(p.id, cat.id, dt.id, source_hash="a")
     b = _sample(p.id, cat.id, dt.id, source_hash="b")
-    b = NewDecision(**{**b.__dict__, "created_at": datetime(2026, 5, 17, 11, 0, tzinfo=timezone.utc)})
+    b = NewDecision(**{**b.__dict__, "created_at": datetime(2026, 5, 17, 11, 0, tzinfo=UTC)})
     insert_decision(conn, a)
     insert_decision(conn, b)
     rows = list_recent(conn, limit=10)

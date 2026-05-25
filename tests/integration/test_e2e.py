@@ -1,21 +1,16 @@
-import threading
 import time
-from datetime import date, datetime, timezone
+from datetime import date
 from pathlib import Path
-
-import pytest
 
 from aido.classifier.fake import FakeClassifier
 from aido.daemon import Daemon
-from aido.mutations import MutationContext
 from aido.store.connection import connect
-from aido.store.decisions import find_by_source_hash, list_recent
+from aido.store.decisions import list_recent
 from aido.store.migrations import init_db
 from aido.store.persons import create_person
 from aido.store.taxonomy import create_category, create_doctype
 from aido.types import ClassificationResult
 from aido.webui.app import WebState, create_app
-from aido.pdf.hash import sha256_of_file
 from tests.fixtures import synth_pdf
 
 
@@ -36,8 +31,10 @@ def _result(person="timo", cat="rechnungen", filename="2026-03-12_rechnung_telek
 
 
 def test_e2e_drop_file_audit_refile(tmp_path: Path):
-    archive = tmp_path / "archive"; archive.mkdir()
-    inbox = tmp_path / "inbox"; inbox.mkdir()
+    archive = tmp_path / "archive"
+    archive.mkdir()
+    inbox = tmp_path / "inbox"
+    inbox.mkdir()
     db = tmp_path / "x.sqlite"
     with connect(db) as conn:
         init_db(conn)
@@ -93,11 +90,14 @@ def test_e2e_drop_file_audit_refile(tmp_path: Path):
         assert rv.status_code == 200
 
         # Re-file under anna/steuer.
-        rv = client.post(f"/decisions/{decision_id}/re-file", json={
-            "person_slug": "anna",
-            "category_slug": "steuer",
-            "filename": "2026-03-12_rechnung_telekom.pdf",
-        })
+        rv = client.post(
+            f"/decisions/{decision_id}/re-file",
+            json={
+                "person_slug": "anna",
+                "category_slug": "steuer",
+                "filename": "2026-03-12_rechnung_telekom.pdf",
+            },
+        )
         assert rv.status_code == 200, rv.data
 
         # Verify the file actually moved.

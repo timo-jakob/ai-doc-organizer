@@ -5,6 +5,7 @@ pytesseract to extract text.  Called by the pipeline when pypdf reports
 NO_TEXT — i.e. the PDF parsed fine but had no embedded text layer (typical
 of stand-alone scanner output).
 """
+
 from __future__ import annotations
 
 import logging
@@ -18,7 +19,7 @@ DEFAULT_LANG = "deu+eng"
 
 class OcrStatus(str, Enum):
     OK = "ok"
-    EMPTY = "empty"          # OCR ran but found no text
+    EMPTY = "empty"  # OCR ran but found no text
     UNAVAILABLE = "unavailable"  # tesseract/poppler missing, or PDF unreadable
 
 
@@ -40,8 +41,8 @@ def ocr_text(
       missing, corrupt PDF, etc.).  The exception is logged at WARNING level.
     """
     try:
-        from pdf2image import convert_from_path  # type: ignore[import-untyped]
         import pytesseract  # type: ignore[import-untyped]
+        from pdf2image import convert_from_path  # type: ignore[import-untyped]
 
         images = convert_from_path(path, dpi=dpi, fmt="png")
         parts: list[str] = []

@@ -1,4 +1,5 @@
 """Settings page: list and admin persons/aliases/categories/doctypes."""
+
 from __future__ import annotations
 
 import sqlite3
@@ -77,9 +78,8 @@ def add_person_route():
 def add_alias_route(person_id: int):
     body = request.get_json(force=True) or {}
     try:
-        with _state().mutations.lock:
-            with _conn():
-                row = add_alias(_conn(), person_id=person_id, alias=body["alias"])
+        with _state().mutations.lock, _conn():
+            row = add_alias(_conn(), person_id=person_id, alias=body["alias"])
     except sqlite3.IntegrityError as e:
         abort(400, description=str(e))
     return jsonify({"ok": True, "id": row.id})

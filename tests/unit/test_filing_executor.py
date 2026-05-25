@@ -36,8 +36,11 @@ def test_file_document_to_review_uses_top_level(tmp_path: Path):
     target = file_document(
         src,
         archive_root=archive,
-        target=FilingTarget(person_slug=None, category_slug="_review",
-                            filename="2026-03-15_uncertain_low-confidence_unknown.pdf"),
+        target=FilingTarget(
+            person_slug=None,
+            category_slug="_review",
+            filename="2026-03-15_uncertain_low-confidence_unknown.pdf",
+        ),
     )
     assert target == archive / "_review" / "2026-03-15_uncertain_low-confidence_unknown.pdf"
 
@@ -67,8 +70,9 @@ def test_creates_missing_directories(tmp_path: Path):
     out = file_document(
         src,
         archive_root=archive,
-        target=FilingTarget(person_slug="anna", category_slug="medizin",
-                            filename="2026-01-19_letter_helios.pdf"),
+        target=FilingTarget(
+            person_slug="anna", category_slug="medizin", filename="2026-01-19_letter_helios.pdf"
+        ),
     )
     assert out.exists()
     assert out.parent == archive / "anna" / "medizin"

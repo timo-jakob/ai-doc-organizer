@@ -1,4 +1,5 @@
 """Decisions repository."""
+
 from __future__ import annotations
 
 import sqlite3
@@ -65,6 +66,7 @@ class DecisionRow:
 @dataclass(frozen=True)
 class DecisionUpdate:
     """Fields a manual action might change. None = leave alone."""
+
     filed_path: str | None = None
     person_id: int | None = None
     category_id: int | None = None
@@ -108,21 +110,31 @@ def insert_decision(conn: sqlite3.Connection, d: NewDecision) -> int:
         "  needs_review, status"
         ") VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
         (
-            d.created_at, d.source_hash, d.source_path, d.filed_path,
-            d.person_id, d.category_id, d.doctype_id,
-            d.document_date, d.counterparty, d.proposed_filename,
-            d.overall_confidence, d.person_confidence, d.category_confidence,
-            d.reasoning, d.classifier_model, d.new_category_proposal,
-            int(d.needs_review), d.status.value,
+            d.created_at,
+            d.source_hash,
+            d.source_path,
+            d.filed_path,
+            d.person_id,
+            d.category_id,
+            d.doctype_id,
+            d.document_date,
+            d.counterparty,
+            d.proposed_filename,
+            d.overall_confidence,
+            d.person_confidence,
+            d.category_confidence,
+            d.reasoning,
+            d.classifier_model,
+            d.new_category_proposal,
+            int(d.needs_review),
+            d.status.value,
         ),
     )
     return cur.lastrowid
 
 
 def get_decision(conn: sqlite3.Connection, decision_id: int) -> DecisionRow | None:
-    row = conn.execute(
-        f"SELECT {_COLS} FROM decisions WHERE id = ?", (decision_id,)
-    ).fetchone()
+    row = conn.execute(f"SELECT {_COLS} FROM decisions WHERE id = ?", (decision_id,)).fetchone()
     return _row_to_decision(row) if row else None
 
 
@@ -141,23 +153,18 @@ def list_recent(
 ) -> list[DecisionRow]:
     where = "WHERE needs_review = 1 " if needs_review_only else ""
     rows = conn.execute(
-        f"SELECT {_COLS} FROM decisions {where}"
-        "ORDER BY created_at DESC LIMIT ?",
+        f"SELECT {_COLS} FROM decisions {where}ORDER BY created_at DESC LIMIT ?",
         (limit,),
     ).fetchall()
     return [_row_to_decision(r) for r in rows]
 
 
 def count_needs_review(conn: sqlite3.Connection) -> int:
-    row = conn.execute(
-        "SELECT COUNT(*) FROM decisions WHERE needs_review = 1"
-    ).fetchone()
+    row = conn.execute("SELECT COUNT(*) FROM decisions WHERE needs_review = 1").fetchone()
     return row[0]
 
 
-def update_decision(
-    conn: sqlite3.Connection, decision_id: int, update: DecisionUpdate
-) -> None:
+def update_decision(conn: sqlite3.Connection, decision_id: int, update: DecisionUpdate) -> None:
     sets: list[str] = []
     params: list[object] = []
     if update.filed_path is not None:

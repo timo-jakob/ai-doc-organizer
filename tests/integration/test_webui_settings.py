@@ -1,6 +1,5 @@
 import threading
-from datetime import datetime, timezone
-from pathlib import Path
+from datetime import UTC, datetime
 
 import pytest
 
@@ -8,7 +7,12 @@ from aido.daemon import HealthState
 from aido.mutations import MutationContext
 from aido.store.connection import connect
 from aido.store.migrations import init_db
-from aido.store.persons import create_person, find_person_by_alias, list_aliases_for, get_person_by_slug
+from aido.store.persons import (
+    create_person,
+    find_person_by_alias,
+    get_person_by_slug,
+    list_aliases_for,
+)
 from aido.store.taxonomy import create_category, get_category_by_slug, get_doctype_by_slug
 from aido.webui.app import WebState, create_app
 
@@ -25,10 +29,13 @@ def web(tmp_path):
     state_conn_ctx = connect(db)
     conn = state_conn_ctx.__enter__()
     state = WebState(
-        db_path=db, archive_root=archive,
+        db_path=db,
+        archive_root=archive,
         mutations=MutationContext(
-            conn=conn, archive_root=archive, lock=threading.Lock(),
-            now=lambda: datetime.now(timezone.utc),
+            conn=conn,
+            archive_root=archive,
+            lock=threading.Lock(),
+            now=lambda: datetime.now(UTC),
         ),
         health=HealthState(),
     )
@@ -51,10 +58,15 @@ def test_settings_renders(web):
 
 def test_add_person(web):
     client, conn = web
-    rv = client.post("/settings/persons", json={
-        "slug": "anna", "display_name": "Anna Jakob", "is_shared": False,
-        "aliases": ["Anna Jakob"],
-    })
+    rv = client.post(
+        "/settings/persons",
+        json={
+            "slug": "anna",
+            "display_name": "Anna Jakob",
+            "is_shared": False,
+            "aliases": ["Anna Jakob"],
+        },
+    )
     assert rv.status_code == 200
     assert get_person_by_slug(conn, "anna") is not None
     p = get_person_by_slug(conn, "anna")
@@ -71,18 +83,27 @@ def test_add_alias_to_existing(web):
 
 def test_add_category(web):
     client, conn = web
-    rv = client.post("/settings/categories", json={
-        "slug": "garten", "display_name": "Garten", "description": "Garten-Sachen",
-    })
+    rv = client.post(
+        "/settings/categories",
+        json={
+            "slug": "garten",
+            "display_name": "Garten",
+            "description": "Garten-Sachen",
+        },
+    )
     assert rv.status_code == 200
     assert get_category_by_slug(conn, "garten") is not None
 
 
 def test_add_doctype(web):
     client, conn = web
-    rv = client.post("/settings/doctypes", json={
-        "slug": "gartenrechnung", "display_name": "Gartenrechnung",
-    })
+    rv = client.post(
+        "/settings/doctypes",
+        json={
+            "slug": "gartenrechnung",
+            "display_name": "Gartenrechnung",
+        },
+    )
     assert rv.status_code == 200
     assert get_doctype_by_slug(conn, "gartenrechnung") is not None
 

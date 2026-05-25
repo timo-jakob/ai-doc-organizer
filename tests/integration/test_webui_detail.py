@@ -1,6 +1,5 @@
 import threading
-from datetime import date, datetime, timezone
-from pathlib import Path
+from datetime import UTC, date, datetime
 
 import pytest
 
@@ -29,18 +28,29 @@ def web(tmp_path):
         filed = archive / "timo" / "rechnungen" / "2026-03-12_rechnung_telekom.pdf"
         filed.parent.mkdir(parents=True)
         filed.write_bytes(b"%PDF-1.4\n%pretend\n")
-        new_id = insert_decision(conn, NewDecision(
-            created_at=datetime(2026, 5, 17, 10, tzinfo=timezone.utc),
-            source_hash="h1", source_path="/s/x.pdf", filed_path=str(filed),
-            person_id=timo.id, category_id=cat.id, doctype_id=dt.id,
-            document_date=date(2026, 3, 12), counterparty="telekom",
-            proposed_filename="2026-03-12_rechnung_telekom.pdf",
-            overall_confidence=0.93, person_confidence=0.95, category_confidence=0.91,
-            reasoning="recipient Timo; sender Telekom",
-            classifier_model="claude-opus-4-7",
-            new_category_proposal=None, needs_review=False,
-            status=DecisionStatus.AUTO_FILED,
-        ))
+        new_id = insert_decision(
+            conn,
+            NewDecision(
+                created_at=datetime(2026, 5, 17, 10, tzinfo=UTC),
+                source_hash="h1",
+                source_path="/s/x.pdf",
+                filed_path=str(filed),
+                person_id=timo.id,
+                category_id=cat.id,
+                doctype_id=dt.id,
+                document_date=date(2026, 3, 12),
+                counterparty="telekom",
+                proposed_filename="2026-03-12_rechnung_telekom.pdf",
+                overall_confidence=0.93,
+                person_confidence=0.95,
+                category_confidence=0.91,
+                reasoning="recipient Timo; sender Telekom",
+                classifier_model="claude-opus-4-7",
+                new_category_proposal=None,
+                needs_review=False,
+                status=DecisionStatus.AUTO_FILED,
+            ),
+        )
     state = WebState(
         db_path=db,
         archive_root=archive,
@@ -48,7 +58,7 @@ def web(tmp_path):
             conn=None,  # webui doesn't reuse the worker's connection
             archive_root=archive,
             lock=threading.Lock(),
-            now=lambda: datetime.now(timezone.utc),
+            now=lambda: datetime.now(UTC),
         ),
         health=HealthState(),
     )
@@ -64,7 +74,7 @@ def test_detail_renders(web):
     body = rv.get_data(as_text=True)
     assert "telekom" in body.lower()
     assert "sender Telekom" in body  # reasoning shown
-    assert f'/pdf/{new_id}' in body  # iframe src present
+    assert f"/pdf/{new_id}" in body  # iframe src present
 
 
 def test_detail_404_for_unknown(web):

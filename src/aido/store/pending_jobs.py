@@ -1,4 +1,5 @@
 """Retry queue for classifier failures."""
+
 from __future__ import annotations
 
 import sqlite3
@@ -52,9 +53,7 @@ def enqueue_pending(
     return cur.lastrowid
 
 
-def claim_due(
-    conn: sqlite3.Connection, *, now: datetime, limit: int = 10
-) -> list[PendingJobRow]:
+def claim_due(conn: sqlite3.Connection, *, now: datetime, limit: int = 10) -> list[PendingJobRow]:
     rows = conn.execute(
         f"SELECT {_COLS} FROM pending_jobs WHERE next_attempt_at <= ? "
         "ORDER BY next_attempt_at ASC LIMIT ?",

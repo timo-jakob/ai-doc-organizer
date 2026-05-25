@@ -1,4 +1,5 @@
 """Domain types and enums for aido."""
+
 from __future__ import annotations
 
 from dataclasses import dataclass

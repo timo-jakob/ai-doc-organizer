@@ -1,4 +1,5 @@
 """Persons + aliases repository."""
+
 from __future__ import annotations
 
 import sqlite3
@@ -100,9 +101,7 @@ def add_alias(conn: sqlite3.Connection, *, person_id: int, alias: str) -> AliasR
         (normalized,),
     ).fetchone()
     if other_person:
-        raise sqlite3.IntegrityError(
-            f"UNIQUE constraint failed: person_aliases.alias_normalized"
-        )
+        raise sqlite3.IntegrityError("UNIQUE constraint failed: person_aliases.alias_normalized")
 
     cur = conn.execute(
         "INSERT INTO person_aliases(person_id, alias, alias_normalized) VALUES (?, ?, ?)",

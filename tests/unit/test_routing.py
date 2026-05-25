@@ -2,7 +2,7 @@ from datetime import date
 
 import pytest
 
-from aido.classifier.routing import RouteDecision, RouteReason, route
+from aido.classifier.routing import RouteReason, route
 from aido.store.connection import connect
 from aido.store.migrations import init_db
 from aido.store.persons import create_person

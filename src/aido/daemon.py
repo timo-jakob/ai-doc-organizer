@@ -1,15 +1,16 @@
 """aido daemon: wires watcher + queue + worker + classifier; tracks health."""
+
 from __future__ import annotations
 
 import logging
 import os
 import sqlite3
 import threading
+from collections.abc import Callable
 from dataclasses import dataclass, field
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from enum import Enum
 from pathlib import Path
-from typing import Callable
 
 from aido.classifier.base import Classifier
 from aido.mutations import MutationContext
@@ -119,7 +120,7 @@ class Daemon:
             conn=self._conn,
             archive_root=self._archive_root,
             lock=threading.Lock(),
-            now=lambda: datetime.now(timezone.utc),
+            now=lambda: datetime.now(UTC),
         )
 
         classifier = self._classifier_factory(self._conn)
@@ -133,8 +134,9 @@ class Daemon:
         )
 
         self._queue.drain_existing(self._inbox)
-        self._watcher = InboxWatcher(inbox=self._inbox, queue=self._queue,
-                                     poll_interval=self._poll_interval)
+        self._watcher = InboxWatcher(
+            inbox=self._inbox, queue=self._queue, poll_interval=self._poll_interval
+        )
         self._watcher.start()
 
         self._worker_thread = threading.Thread(
@@ -163,7 +165,7 @@ class Daemon:
             if path is None:
                 continue
             outcome = pipeline.process(path)
-            self.health.record_outcome(outcome, now=datetime.now(timezone.utc))
+            self.health.record_outcome(outcome, now=datetime.now(UTC))
 
 
 def _process_alive(pid: int) -> bool:

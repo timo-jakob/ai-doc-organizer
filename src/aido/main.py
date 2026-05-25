@@ -1,4 +1,5 @@
 """Main entrypoint: wires config → daemon → web UI and runs them together."""
+
 from __future__ import annotations
 
 import argparse
@@ -7,9 +8,9 @@ import signal
 import sqlite3
 import sys
 import threading
+from collections.abc import Sequence
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Sequence
 
 from aido.classifier.factory import build_classifier
 from aido.config import Config, load_config
@@ -87,9 +88,11 @@ def run(
         ready_event.set()
 
     if run_web:
+
         def _sigterm(*_):
             rt.shutdown()
             sys.exit(0)
+
         signal.signal(signal.SIGTERM, _sigterm)
         signal.signal(signal.SIGINT, _sigterm)
         try:

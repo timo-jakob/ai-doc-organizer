@@ -1,12 +1,9 @@
 from pathlib import Path
 
-import pytest
-
 from aido.cli import main as cli_main
 from aido.store.connection import connect
 from aido.store.persons import find_person_by_alias, list_persons
 from aido.store.taxonomy import (
-    get_category_by_slug,
     get_doctype_by_slug,
     get_review_category,
     list_categories,
@@ -98,13 +95,19 @@ def test_init_creates_archive_and_inbox_paths(tmp_path: Path, monkeypatch):
     inbox = tmp_path / "inbox"
     seed = tmp_path / "seed.yaml"
     seed.write_text("persons: []\ncategories: []\ndoctypes: []\n", encoding="utf-8")
-    rc = cli_main([
-        "init",
-        "--db", str(db),
-        "--seed", str(seed),
-        "--archive-root", str(archive),
-        "--scan-inbox", str(inbox),
-    ])
+    rc = cli_main(
+        [
+            "init",
+            "--db",
+            str(db),
+            "--seed",
+            str(seed),
+            "--archive-root",
+            str(archive),
+            "--scan-inbox",
+            str(inbox),
+        ]
+    )
     assert rc == 0
     assert archive.exists()
     assert inbox.exists()

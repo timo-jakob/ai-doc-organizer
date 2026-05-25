@@ -1,4 +1,5 @@
 """Filename construction and collision handling."""
+
 from __future__ import annotations
 
 from datetime import date
@@ -44,6 +45,4 @@ def next_available_name(target: Path, *, max_attempts: int = 1000) -> Path:
         candidate = parent / f"{stem}_{i}{suffix}"
         if not candidate.exists():
             return candidate
-    raise FileExistsError(
-        f"Could not find a free name for {target} after {max_attempts} attempts"
-    )
+    raise FileExistsError(f"Could not find a free name for {target} after {max_attempts} attempts")
