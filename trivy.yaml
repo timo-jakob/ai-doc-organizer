@@ -1,0 +1,38 @@
+# Trivy config — used by both vulnerability and license scans on the
+# filesystem (deps in lockfiles) and on the built container image.
+
+severity:
+  - CRITICAL
+  - HIGH
+
+vulnerability:
+  ignore-unfixed: false
+
+scan:
+  scanners:
+    - vuln
+    - secret
+    - misconfig
+    - license
+
+# License policy. Trivy ships sensible defaults — AGPL/SSPL are forbidden
+# (HIGH severity → blocks CI), GPL/LGPL are restricted (MEDIUM → reported
+# but doesn't fail by default).
+license:
+  full: false
+  confidence-level: 0.9
+  # forbidden:
+  #   - GPL-2.0
+  #   - GPL-2.0-only
+  #   - GPL-2.0-or-later
+  #   - GPL-3.0
+  #   - GPL-3.0-only
+  #   - GPL-3.0-or-later
+  # restricted:
+  #   - LGPL-2.1
+  #   - LGPL-3.0
+
+format: table
+exit-code: 1
+
+ignore-policy: ""

@@ -1,0 +1,295 @@
+# Quality + security pipeline for PUBLIC repositories.
+# Runs on github-hosted runners. Uses SonarCloud for static analysis +
+# coverage and Snyk for security (code + open source + container).
+#
+# Image publishing: built image is scanned, then pushed to GitHub Container
+# Registry (ghcr.io/<owner>/<repo>) on merge to main + release events. The
+# scan gates the push — a vulnerable image never reaches the registry.
+
+name: Quality (public)
+
+on:
+  pull_request:
+    branches: ["main"]
+    paths-ignore:
+      - "**.md"
+      - "LICENSE"
+      - ".gitignore"
+      - "docs/**"
+  push:
+    branches: ["main"]
+    paths-ignore:
+      - "**.md"
+      - "LICENSE"
+      - ".gitignore"
+      - "docs/**"
+  release:
+    types: [published]
+  schedule:
+    # Weekly Monday 06:00 UTC — drift detection against newly-disclosed CVEs
+    # and updated license categorizations. Matches CodeQL's weekly cadence.
+    - cron: "0 6 * * 1"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pull-requests: write
+  security-events: write
+  packages: write          # required for ghcr.io push
+  id-token: write          # required for cosign keyless OIDC signing
+
+concurrency:
+  group: quality-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  REGISTRY: ghcr.io
+  IMAGE_NAME: ${{ github.repository }}
+
+jobs:
+  test-and-coverage:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0   # SonarCloud needs full history for blame
+
+      - name: Setup Python
+        uses: actions/setup-python@v6
+        with:
+          python-version: "3.13"
+          cache: "pip"
+
+      - name: Install system dependencies (OCR + PDF)
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            tesseract-ocr \
+            tesseract-ocr-deu \
+            tesseract-ocr-eng \
+            poppler-utils
+
+      - name: Install + test (Python)
+        run: |
+          pip install -r requirements.txt || pip install -e ".[dev]"
+          pytest --cov --cov-report=xml --cov-report=term
+
+      - name: Upload coverage artifact
+        uses: actions/upload-artifact@v7
+        with:
+          name: coverage-reports
+          path: |
+            coverage.xml
+            coverage.out
+            coverage.lcov
+            coverage/lcov.info
+          if-no-files-found: ignore
+
+  # --- SonarCloud -----------------------------------------------------------
+  sonarcloud:
+    needs: test-and-coverage
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+      - name: Download coverage
+        uses: actions/download-artifact@v8
+        with:
+          name: coverage-reports
+          path: .
+        continue-on-error: true
+      - name: SonarCloud scan
+        uses: SonarSource/sonarqube-scan-action@v8
+        env:
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+          SONAR_HOST_URL: https://sonarcloud.io
+
+  # --- Snyk: source code ----------------------------------------------------
+  snyk-code:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - name: Snyk Code (SAST)
+        uses: snyk/actions/setup@v1.0.0
+      - run: snyk code test --severity-threshold=high
+        env:
+          SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
+
+  # --- Snyk: open-source dependencies ---------------------------------------
+  snyk-open-source:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - uses: snyk/actions/setup@v1.0.0
+      - run: snyk test --severity-threshold=high --all-projects
+        env:
+          SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
+
+  # --- License compliance (dependencies) ------------------------------------
+  # Uses Trivy as an open-source license scanner. Catches deps shipping
+  # incompatible licenses (AGPL/SSPL → HIGH severity, blocks CI by default).
+  # Policy customizable via trivy.yaml.
+  license-fs:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - uses: aquasecurity/trivy-action@0.36.0
+        with:
+          scan-type: "fs"
+          scan-ref: "."
+          scanners: "license"
+          severity: "CRITICAL,HIGH"
+          exit-code: "1"
+          format: "table"
+          trivy-config: trivy.yaml
+
+  # Container image pipeline.
+  #
+  # PRs                     → build linux/amd64 only, scan, no push (fast)
+  # push to main / release  → build linux/amd64 + linux/arm64, scan, push to GHCR
+  image:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Set up QEMU (for arm64 emulation)
+        uses: docker/setup-qemu-action@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v4
+
+      - name: Compute image tags
+        id: meta
+        uses: docker/metadata-action@v6
+        with:
+          images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
+          tags: |
+            type=ref,event=branch
+            type=sha,format=short,prefix=sha-
+            type=raw,value=latest,enable={{is_default_branch}}
+            type=semver,pattern={{version}}
+            type=semver,pattern={{major}}.{{minor}}
+            type=semver,pattern={{major}}
+
+      - name: Build image (amd64 only, for scanning)
+        uses: docker/build-push-action@v7
+        with:
+          context: .
+          platforms: linux/amd64
+          load: true
+          push: false
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Pick a tag for scanning
+        id: pick
+        run: |
+          tag=$(echo '${{ steps.meta.outputs.tags }}' | head -n1)
+          echo "tag=$tag" >> "$GITHUB_OUTPUT"
+
+      - name: Snyk container scan
+        uses: snyk/actions/setup@v1.0.0
+      - run: |
+          snyk container test "${{ steps.pick.outputs.tag }}" \
+            --severity-threshold=high --file=Dockerfile
+        env:
+          SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
+
+      - name: Trivy license scan (image)
+        uses: aquasecurity/trivy-action@0.36.0
+        with:
+          scan-type: "image"
+          image-ref: ${{ steps.pick.outputs.tag }}
+          scanners: "license"
+          severity: "CRITICAL,HIGH"
+          exit-code: "1"
+          format: "table"
+          trivy-config: trivy.yaml
+
+      - name: Login to GHCR
+        if: github.event_name == 'push' || github.event_name == 'release'
+        uses: docker/login-action@v4
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build + push multi-arch image (with SBOM + provenance)
+        id: build-push
+        if: github.event_name == 'push' || github.event_name == 'release'
+        uses: docker/build-push-action@v7
+        with:
+          context: .
+          platforms: linux/amd64,linux/arm64
+          push: true
+          sbom: true
+          provenance: mode=max
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Export SBOM as CI artifact
+        if: github.event_name == 'push' || github.event_name == 'release'
+        uses: anchore/sbom-action@v0
+        with:
+          image: ${{ steps.pick.outputs.tag }}
+          format: cyclonedx-json
+          output-file: sbom.cdx.json
+
+      - name: Validate SBOM is well-formed CycloneDX
+        if: github.event_name == 'push' || github.event_name == 'release'
+        run: |
+          docker run --rm -v "$PWD:/work" cyclonedx/cyclonedx-cli:latest \
+            validate --input-file /work/sbom.cdx.json --input-format json --fail-on-errors
+
+      - name: Upload SBOM artifact
+        if: github.event_name == 'push' || github.event_name == 'release'
+        uses: actions/upload-artifact@v7
+        with:
+          name: sbom-cyclonedx-${{ github.sha }}
+          path: sbom.cdx.json
+          retention-days: 90
+
+      - name: Install cosign
+        if: github.event_name == 'push' || github.event_name == 'release'
+        uses: sigstore/cosign-installer@v4
+
+      - name: Sign image with cosign (keyless OIDC)
+        if: github.event_name == 'push' || github.event_name == 'release'
+        env:
+          IMAGE_DIGEST: ${{ steps.build-push.outputs.digest }}
+          TAGS: ${{ steps.meta.outputs.tags }}
+        run: |
+          for tag in $TAGS; do
+            cosign sign --yes "${tag}@${IMAGE_DIGEST}"
+          done
+
+  # --- Semgrep (free OSS rules) ---------------------------------------------
+  semgrep:
+    runs-on: ubuntu-latest
+    container:
+      image: returntocorp/semgrep
+    steps:
+      - uses: actions/checkout@v6
+      - run: semgrep ci --config=auto
+        env:
+          SEMGREP_APP_TOKEN: ${{ secrets.SEMGREP_APP_TOKEN }}   # optional
+
+  # --- Pre-commit (CI backstop) ---------------------------------------------
+  # Catches contributors who bypassed local hooks with `git commit
+  # --no-verify` or pushed from a machine without pre-commit installed.
+  pre-commit:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.13"
+      - uses: pre-commit/action@v3.0.1

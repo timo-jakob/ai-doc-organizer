@@ -36,3 +36,15 @@ logs/
 *.sqlite-journal
 *.sqlite-wal
 *.sqlite-shm
+
+# Python (added by /development:bootstrap — net-new entries only;
+# duplicates of the section above were deduped before append)
+ENV/
+*.egg
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+.coverage
+coverage.xml
+htmlcov/
+.tox/
