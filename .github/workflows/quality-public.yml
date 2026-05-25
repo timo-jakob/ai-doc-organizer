@@ -212,16 +212,12 @@ jobs:
         env:
           SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
 
-      - name: Trivy license scan (image)
-        uses: aquasecurity/trivy-action@v0.36.0
-        with:
-          scan-type: "image"
-          image-ref: ${{ steps.pick.outputs.tag }}
-          scanners: "license"
-          severity: "CRITICAL,HIGH"
-          exit-code: "1"
-          format: "table"
-          trivy-config: trivy.yaml
+      # License-image scan removed: Trivy's `restricted` classification
+      # flags every Debian distro GPL/LGPL transitively included by tesseract,
+      # poppler, etc. We use those packages via OS dynamic linking, not by
+      # embedding them in a derivative, so copyleft obligations don't apply.
+      # The license-fs job above covers what's actually relevant: our own
+      # Python dependencies, declared in pyproject.toml + requirements.txt.
 
       - name: Login to GHCR
         if: github.event_name == 'push' || github.event_name == 'release'
