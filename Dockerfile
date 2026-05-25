@@ -1,9 +1,11 @@
-# Pinned to a specific digest of python:3.13-slim (rebuild date 2026-05-22 UTC).
-# Pinning to digest forces Buildx to pull this exact image — that's what
-# carries patched Debian libxml2 and libexpat1, which a floating tag may
-# silently revert to an older rebuild. Refresh the digest via:
-#   docker pull python:3.13-slim && docker inspect --format '{{.RepoDigests}}' python:3.13-slim
-FROM python:3.13-slim@sha256:7ba5f5888fbe0014ab9edb2278922995c2201fc3752c46b0be24763eb46fa9f3 AS base
+# Bookworm (Debian 12) base, pinned to a specific digest (rebuild 2026-05-20).
+# We switched off the default `python:3.13-slim` (trixie) because Debian 13
+# hadn't yet shipped the libxml2 / libexpat1 patches Snyk was flagging;
+# Bookworm has had those for longer. Pinning to digest stops Buildx from
+# silently moving us to an older rebuild. Refresh via:
+#   docker pull python:3.13-slim-bookworm && \
+#   docker inspect --format '{{.RepoDigests}}' python:3.13-slim-bookworm
+FROM python:3.13-slim-bookworm@sha256:f576b530293e74140ea91d262232648d5c4f45640a95ec447757701bfcacf034 AS base
 
 # Node.js is needed because the Claude Agent SDK spawns the bundled Claude
 # Code CLI as a subprocess.
