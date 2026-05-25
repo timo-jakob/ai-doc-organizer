@@ -1,0 +1,16 @@
+# Runtime dependencies. Mirrors [project.dependencies] in pyproject.toml.
+# pyproject.toml is the source of truth for package metadata; this file
+# exists so Snyk / Dependabot / Trivy can detect dependencies (they don't
+# read setuptools-style pyproject.toml without a lockfile).
+#
+# Keep in sync with pyproject.toml when adding/removing/bumping deps.
+
+claude-agent-sdk>=0.1.0
+anthropic>=0.40.0
+pypdf>=4.0.0
+watchdog>=4.0.0
+flask>=3.0.0
+jinja2>=3.1.0
+ruamel.yaml>=0.18.0
+pytesseract>=0.3.10
+pdf2image>=1.17.0
