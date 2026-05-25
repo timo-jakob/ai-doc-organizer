@@ -1,3 +1,5 @@
+import sqlite3
+
 import pytest
 
 from aido.store.connection import connect
@@ -69,5 +71,5 @@ def test_list_doctypes(conn):
 
 def test_duplicate_slug_raises(conn):
     create_category(conn, slug="x", display_name="X")
-    with pytest.raises(Exception):
+    with pytest.raises(sqlite3.IntegrityError):
         create_category(conn, slug="x", display_name="Y")

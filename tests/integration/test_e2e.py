@@ -62,7 +62,7 @@ def test_e2e_drop_file_audit_refile(tmp_path: Path):
     )
     daemon.start()
     try:
-        pdf = synth_pdf(inbox / "scan001.pdf", text=["Telekom Rechnung", "Timo Jakob"])
+        synth_pdf(inbox / "scan001.pdf", text=["Telekom Rechnung", "Timo Jakob"])
         # Wait for the daemon to file it (expected within ~3s).
         decision_id = None
         deadline = time.monotonic() + 5

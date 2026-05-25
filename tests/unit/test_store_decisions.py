@@ -1,3 +1,4 @@
+import sqlite3
 from datetime import UTC, date, datetime
 
 import pytest
@@ -69,7 +70,7 @@ def test_insert_and_get(ctx):
 def test_insert_duplicate_source_hash_raises(ctx):
     conn, p, cat, dt, _ = ctx
     insert_decision(conn, _sample(p.id, cat.id, dt.id))
-    with pytest.raises(Exception):
+    with pytest.raises(sqlite3.IntegrityError):
         insert_decision(conn, _sample(p.id, cat.id, dt.id, source_hash="h1"))
 
 

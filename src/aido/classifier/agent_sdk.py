@@ -33,7 +33,7 @@ def build_system_prompt(conn: sqlite3.Connection) -> str:
         " - the document's date (invoice date, letter date, etc.),\n"
         " - the document type (a single label from the doctype vocabulary),\n"
         " - the counterparty (the sender/issuer of the document),\n"
-        " - your confidence in each decision (0.0–1.0).\n"
+        " - your confidence in each decision (0.0-1.0).\n"
         "\n"
         "If a document is clearly addressed to ONE specific family member, file it "
         "under that person, even when other family members are mentioned. Use the "

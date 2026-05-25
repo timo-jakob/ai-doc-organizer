@@ -3,13 +3,13 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from enum import Enum
+from enum import StrEnum
 from pathlib import Path
 
 from ruamel.yaml import YAML
 
 
-class ClassifierBackend(str, Enum):
+class ClassifierBackend(StrEnum):
     AGENT_SDK = "agent_sdk"
     ANTHROPIC_API = "anthropic_api"
     LOCAL_LLM = "local_llm"

@@ -18,19 +18,19 @@ from tests.fixtures import synth_empty_pdf, synth_pdf
 
 
 def _result(**over) -> ClassificationResult:
-    base = dict(
-        person_slug="timo",
-        category_slug="rechnungen",
-        doctype_slug="rechnung",
-        document_date=date(2026, 3, 12),
-        counterparty="telekom",
-        proposed_filename="2026-03-12_rechnung_telekom.pdf",
-        overall_confidence=0.93,
-        person_confidence=0.95,
-        category_confidence=0.91,
-        new_category_proposal=None,
-        reasoning="r",
-    )
+    base = {
+        "person_slug": "timo",
+        "category_slug": "rechnungen",
+        "doctype_slug": "rechnung",
+        "document_date": date(2026, 3, 12),
+        "counterparty": "telekom",
+        "proposed_filename": "2026-03-12_rechnung_telekom.pdf",
+        "overall_confidence": 0.93,
+        "person_confidence": 0.95,
+        "category_confidence": 0.91,
+        "new_category_proposal": None,
+        "reasoning": "r",
+    }
     base.update(over)
     return ClassificationResult(**base)
 

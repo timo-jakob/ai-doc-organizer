@@ -2,16 +2,19 @@
 
 from __future__ import annotations
 
-from enum import Enum
+import logging
+from enum import StrEnum
 from pathlib import Path
 
 from pypdf import PdfReader
 from pypdf.errors import PdfReadError, PyPdfError
 
+logger = logging.getLogger(__name__)
+
 DEFAULT_MAX_CHARS = 6 * 1024
 
 
-class ExtractStatus(str, Enum):
+class ExtractStatus(StrEnum):
     OK = "ok"
     NO_TEXT = "no_text"
     UNREADABLE = "unreadable"
@@ -38,8 +41,9 @@ def extract_text(path: Path, *, max_chars: int = DEFAULT_MAX_CHARS) -> tuple[str
     for page in reader.pages:
         try:
             page_text = page.extract_text() or ""
-        except Exception:
+        except Exception as e:
             # Per-page extraction failure shouldn't abort the whole document.
+            logger.warning("PDF page text extraction failed: %s", e)
             continue
         if not page_text:
             continue

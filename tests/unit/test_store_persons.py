@@ -1,3 +1,5 @@
+import sqlite3
+
 import pytest
 
 from aido.store.connection import connect
@@ -61,7 +63,7 @@ def test_alias_normalized_is_unique(conn):
     p1 = create_person(conn, slug="timo", display_name="Timo")
     p2 = create_person(conn, slug="other", display_name="Other")
     add_alias(conn, person_id=p1.id, alias="Jakob")
-    with pytest.raises(Exception):  # IntegrityError under the hood
+    with pytest.raises(sqlite3.IntegrityError):  # IntegrityError under the hood
         add_alias(conn, person_id=p2.id, alias="jakob")
 
 
@@ -75,5 +77,5 @@ def test_list_aliases_for(conn):
 
 def test_create_person_with_duplicate_slug_raises(conn):
     create_person(conn, slug="timo", display_name="Timo")
-    with pytest.raises(Exception):
+    with pytest.raises(sqlite3.IntegrityError):
         create_person(conn, slug="timo", display_name="Other")

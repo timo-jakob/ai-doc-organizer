@@ -77,10 +77,7 @@ def test_daemon_files_a_pdf_dropped_in_inbox(seeded):
                 else:
                     # Already moved — scan archive folder for files
                     moved = list(seeded["archive"].rglob("*.pdf"))
-                    if moved:
-                        h = sha256_of_file(moved[0])
-                    else:
-                        h = ""
+                    h = sha256_of_file(moved[0]) if moved else ""
                 if h:
                     decision = find_by_source_hash(conn, h)
                 if decision is not None:

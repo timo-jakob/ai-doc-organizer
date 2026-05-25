@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import contextlib
 import logging
 import os
 import sqlite3
@@ -9,7 +10,7 @@ import threading
 from collections.abc import Callable
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
-from enum import Enum
+from enum import StrEnum
 from pathlib import Path
 
 from aido.classifier.base import Classifier
@@ -23,7 +24,7 @@ from aido.worker.watcher import InboxWatcher
 _log = logging.getLogger("aido.daemon")
 
 
-class HealthStatus(str, Enum):
+class HealthStatus(StrEnum):
     OK = "ok"
     AUTH_FAILED = "auth_failed"
     CANNOT_WRITE = "cannot_write"
@@ -102,10 +103,8 @@ class Daemon:
         self._pidfile.write_text(str(os.getpid()))
 
     def _release_pidfile(self) -> None:
-        try:
+        with contextlib.suppress(OSError):
             self._pidfile.unlink(missing_ok=True)
-        except OSError:
-            pass
 
     def start(self) -> None:
         self._acquire_pidfile()

@@ -1,3 +1,4 @@
+import sqlite3
 from datetime import UTC, datetime, timedelta
 
 import pytest
@@ -124,7 +125,7 @@ def test_enqueue_duplicate_hash_raises(conn):
     enqueue_pending(
         conn, source_path="/s/a.pdf", source_hash="h1", next_attempt_at=now, created_at=now
     )
-    with pytest.raises(Exception):
+    with pytest.raises(sqlite3.IntegrityError):
         enqueue_pending(
             conn, source_path="/s/a.pdf", source_hash="h1", next_attempt_at=now, created_at=now
         )

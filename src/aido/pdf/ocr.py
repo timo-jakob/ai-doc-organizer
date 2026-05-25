@@ -9,7 +9,7 @@ of stand-alone scanner output).
 from __future__ import annotations
 
 import logging
-from enum import Enum
+from enum import StrEnum
 from pathlib import Path
 
 _log = logging.getLogger("aido.ocr")
@@ -17,7 +17,7 @@ _log = logging.getLogger("aido.ocr")
 DEFAULT_LANG = "deu+eng"
 
 
-class OcrStatus(str, Enum):
+class OcrStatus(StrEnum):
     OK = "ok"
     EMPTY = "empty"  # OCR ran but found no text
     UNAVAILABLE = "unavailable"  # tesseract/poppler missing, or PDF unreadable

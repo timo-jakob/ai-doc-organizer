@@ -16,7 +16,7 @@ def taxonomy_conn(tmp_path):
         init_db(c)
         timo = create_person(c, slug="timo", display_name="Timo Jakob")
         anna = create_person(c, slug="anna", display_name="Anna Jakob")
-        shared = create_person(c, slug="shared", display_name="Shared", is_shared=True)
+        create_person(c, slug="shared", display_name="Shared", is_shared=True)
         for alias in ("Timo Jakob", "T. Jakob", "Jakob"):
             add_alias(c, person_id=timo.id, alias=alias)
         add_alias(c, person_id=anna.id, alias="Anna Jakob")

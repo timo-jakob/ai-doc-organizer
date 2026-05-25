@@ -4,17 +4,17 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from datetime import date
-from enum import Enum
+from enum import StrEnum
 
 
-class DecisionStatus(str, Enum):
+class DecisionStatus(StrEnum):
     AUTO_FILED = "auto_filed"
     REVIEW = "review"
     HUMAN_FILED = "human_filed"
     FAILED = "failed"
 
 
-class ManualAction(str, Enum):
+class ManualAction(StrEnum):
     RE_FILE = "re_file"
     RENAME = "rename"
     DELETE = "delete"
@@ -22,7 +22,7 @@ class ManualAction(str, Enum):
     PROMOTE_CATEGORY = "promote_category"
 
 
-class RouteOutcome(str, Enum):
+class RouteOutcome(StrEnum):
     AUTO_FILE = "auto_file"
     REVIEW = "review"
 

@@ -10,7 +10,7 @@ import logging
 import sqlite3
 import time
 from datetime import UTC, datetime
-from enum import Enum
+from enum import StrEnum
 from pathlib import Path
 
 from aido.classifier.base import Classifier
@@ -32,7 +32,7 @@ from aido.types import (
 _log = logging.getLogger("aido.pipeline")
 
 
-class PipelineOutcome(str, Enum):
+class PipelineOutcome(StrEnum):
     AUTO_FILED = "auto_filed"
     REVIEW = "review"
     DUPLICATE_SKIP = "duplicate_skip"

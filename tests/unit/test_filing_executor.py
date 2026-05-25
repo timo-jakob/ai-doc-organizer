@@ -134,14 +134,16 @@ def test_file_document_propagates_non_exdev_oserror(tmp_path: Path):
     def fake_replace(a, b):
         raise OSError(13, "Permission denied")  # not EXDEV
 
-    with patch("aido.filing.executor.os.replace", side_effect=fake_replace):
-        with pytest.raises(OSError):
-            file_document(
-                src,
-                archive_root=archive,
-                target=FilingTarget(
-                    person_slug="timo",
-                    category_slug="rechnungen",
-                    filename="x.pdf",
-                ),
-            )
+    with (
+        patch("aido.filing.executor.os.replace", side_effect=fake_replace),
+        pytest.raises(OSError),
+    ):
+        file_document(
+            src,
+            archive_root=archive,
+            target=FilingTarget(
+                person_slug="timo",
+                category_slug="rechnungen",
+                filename="x.pdf",
+            ),
+        )

@@ -21,16 +21,23 @@ scan:
 license:
   full: false
   confidence-level: 0.9
-  # forbidden:
-  #   - GPL-2.0
-  #   - GPL-2.0-only
-  #   - GPL-2.0-or-later
-  #   - GPL-3.0
-  #   - GPL-3.0-only
-  #   - GPL-3.0-or-later
-  # restricted:
-  #   - LGPL-2.1
-  #   - LGPL-3.0
+  # GPL/LGPL show up in distro packages (libxml2, libgnutls30, etc.)
+  # baked into the python:3.13-slim base image. Since this project is
+  # MIT-licensed and uses these packages via OS dynamic linking (not
+  # statically embedding them in a derivative), we don't take on their
+  # copyleft obligations. Mark them as ignored so license-image scan
+  # doesn't fail CI on transitive distro licenses.
+  ignored:
+    - GPL-2.0-only
+    - GPL-2.0-or-later
+    - GPL-3.0-only
+    - GPL-3.0-or-later
+    - LGPL-2.0-only
+    - LGPL-2.0-or-later
+    - LGPL-2.1-only
+    - LGPL-2.1-or-later
+    - LGPL-3.0-only
+    - LGPL-3.0-or-later
 
 format: table
 exit-code: 1
