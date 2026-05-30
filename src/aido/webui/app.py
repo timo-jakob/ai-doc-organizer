@@ -37,7 +37,7 @@ def create_app(state: WebState) -> Flask:
 
     app.register_blueprint(settings_bp)
 
-    @app.route("/healthz")
+    @app.route("/healthz", methods=["GET"])
     def healthz():
         with connect(state.db_path) as conn:
             pending = count_needs_review(conn)

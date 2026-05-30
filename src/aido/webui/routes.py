@@ -18,7 +18,7 @@ def _state():
     return current_app.config["AIDO_STATE"]
 
 
-@bp.route("/")
+@bp.route("/", methods=["GET"])
 def index() -> str:
     state = _state()
     with connect(state.db_path) as conn:
@@ -34,7 +34,7 @@ def index() -> str:
     )
 
 
-@bp.route("/needs-review")
+@bp.route("/needs-review", methods=["GET"])
 def needs_review() -> str:
     state = _state()
     with connect(state.db_path) as conn:
@@ -50,7 +50,7 @@ def needs_review() -> str:
     )
 
 
-@bp.route("/all")
+@bp.route("/all", methods=["GET"])
 def all_decisions() -> str:
     state = _state()
     with connect(state.db_path) as conn:
@@ -88,7 +88,7 @@ def _hydrate(conn, decisions):
     return out
 
 
-@bp.route("/decisions/<int:decision_id>")
+@bp.route("/decisions/<int:decision_id>", methods=["GET"])
 def detail(decision_id: int) -> str:
     state = _state()
     with connect(state.db_path) as conn:
@@ -116,7 +116,7 @@ def detail(decision_id: int) -> str:
     )
 
 
-@bp.route("/pdf/<int:decision_id>")
+@bp.route("/pdf/<int:decision_id>", methods=["GET"])
 def pdf(decision_id: int):
     state = _state()
     with connect(state.db_path) as conn:
@@ -131,7 +131,7 @@ def pdf(decision_id: int):
     return send_file(p, mimetype="application/pdf")
 
 
-@bp.route("/stats")
+@bp.route("/stats", methods=["GET"])
 def stats() -> str:
     state = _state()
     with connect(state.db_path) as conn:
