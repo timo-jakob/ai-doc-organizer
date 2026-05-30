@@ -17,7 +17,11 @@ def init_db(conn: sqlite3.Connection) -> None:
     ).fetchone()
     if row is None:
         with conn:
-            conn.executescript(_SCHEMA_PATH.read_text(encoding="utf-8"))
+            # _SCHEMA_PATH is a package-internal DDL file (schema.sql) resolved relative
+            # to this module's location — it is developer-controlled, not user-supplied.
+            # executescript() is required for multi-statement DDL and does not support
+            # parameterised queries; the input source is not external/user data.
+            conn.executescript(_SCHEMA_PATH.read_text(encoding="utf-8"))  # nosonar
             conn.execute(
                 "INSERT INTO schema_version(version, applied_at) VALUES (?, ?)",
                 (SCHEMA_VERSION, datetime.now(UTC).isoformat()),
