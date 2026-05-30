@@ -167,3 +167,217 @@ def test_refile_with_missing_field_returns_400(web):
     client, decision_id = web
     rv = client.post(f"/decisions/{decision_id}/re-file", json={"person_slug": "anna"})
     assert rv.status_code == 400
+
+
+def test_refile_with_unknown_person_slug_returns_400(web):
+    """An unknown person slug must abort before any DB mutation occurs."""
+    client, decision_id = web
+    state = client.application.config["AIDO_STATE"]
+    before = get_decision(state.mutations.conn, decision_id)
+    rv = client.post(
+        f"/decisions/{decision_id}/re-file",
+        json={
+            "person_slug": "nonexistent_person",
+            "category_slug": "steuer",
+            "filename": "x.pdf",
+        },
+    )
+    assert rv.status_code == 400
+    # No mutation: decision still points at the original filed_path.
+    after = get_decision(state.mutations.conn, decision_id)
+    assert after.filed_path == before.filed_path
+    assert list_actions_for_decision(state.mutations.conn, decision_id) == []
+
+
+def test_refile_with_unknown_category_slug_returns_400(web):
+    """An unknown category slug must abort before any DB mutation occurs."""
+    client, decision_id = web
+    state = client.application.config["AIDO_STATE"]
+    before = get_decision(state.mutations.conn, decision_id)
+    rv = client.post(
+        f"/decisions/{decision_id}/re-file",
+        json={
+            "person_slug": "anna",
+            "category_slug": "nonexistent_cat",
+            "filename": "x.pdf",
+        },
+    )
+    assert rv.status_code == 400
+    after = get_decision(state.mutations.conn, decision_id)
+    assert after.filed_path == before.filed_path
+    assert list_actions_for_decision(state.mutations.conn, decision_id) == []
+
+
+def test_post_rename_renames_in_place_and_audits(web):
+    """Rename endpoint moves the on-disk file and emits a RENAME audit row."""
+    client, decision_id = web
+    state = client.application.config["AIDO_STATE"]
+    before = get_decision(state.mutations.conn, decision_id)
+    rv = client.post(
+        f"/decisions/{decision_id}/rename",
+        json={"filename": "renamed.pdf", "note": "tidy"},
+    )
+    assert rv.status_code == 200
+    assert rv.get_json() == {"ok": True}
+    after = get_decision(state.mutations.conn, decision_id)
+    # Same parent directory, new filename.
+    assert Path(after.filed_path).parent == Path(before.filed_path).parent
+    assert Path(after.filed_path).name == "renamed.pdf"
+    assert Path(after.filed_path).exists()
+    assert not Path(before.filed_path).exists()
+    [audit] = list_actions_for_decision(state.mutations.conn, decision_id)
+    assert audit.action == ManualAction.RENAME
+    assert audit.note == "tidy"
+
+
+def test_post_rename_strips_path_components_from_filename(web):
+    """Filename input must be reduced to its basename (no traversal)."""
+    client, decision_id = web
+    state = client.application.config["AIDO_STATE"]
+    rv = client.post(
+        f"/decisions/{decision_id}/rename",
+        json={"filename": "../../../evil.pdf"},
+    )
+    assert rv.status_code == 200
+    after = get_decision(state.mutations.conn, decision_id)
+    assert Path(after.filed_path).name == "evil.pdf"
+    # File stayed inside the archive root.
+    assert str(Path(after.filed_path).resolve()).startswith(str(state.archive_root.resolve()))
+
+
+def test_post_rename_unknown_decision_returns_404(web):
+    """Rename against a nonexistent decision returns 404 from the ValueError handler."""
+    client, _ = web
+    rv = client.post("/decisions/9999/rename", json={"filename": "x.pdf"})
+    assert rv.status_code == 404
+
+
+def test_post_rename_missing_field_returns_400(web):
+    """Missing 'filename' field returns 400 from the KeyError handler."""
+    client, decision_id = web
+    rv = client.post(f"/decisions/{decision_id}/rename", json={})
+    assert rv.status_code == 400
+
+
+def test_post_rename_when_file_missing_returns_404(web):
+    """If the on-disk file is gone, rename returns 404 via FileNotFoundError handler."""
+    client, decision_id = web
+    state = client.application.config["AIDO_STATE"]
+    d = get_decision(state.mutations.conn, decision_id)
+    Path(d.filed_path).unlink()
+    rv = client.post(
+        f"/decisions/{decision_id}/rename",
+        json={"filename": "renamed.pdf"},
+    )
+    assert rv.status_code == 404
+
+
+def test_post_delete_unknown_decision_returns_404(web):
+    """delete on a nonexistent decision id returns 404."""
+    client, _ = web
+    rv = client.post("/decisions/9999/delete", json={})
+    assert rv.status_code == 404
+
+
+def test_post_delete_handles_empty_body(web):
+    """delete tolerates a request with no JSON body at all."""
+    client, decision_id = web
+    rv = client.post(f"/decisions/{decision_id}/delete")
+    assert rv.status_code == 200
+
+
+def test_post_approve_unknown_decision_returns_404(web):
+    """approve on a nonexistent decision id returns 404."""
+    client, _ = web
+    rv = client.post("/decisions/9999/approve", json={})
+    assert rv.status_code == 404
+
+
+def test_post_approve_handles_empty_body(web):
+    """approve tolerates a request with no JSON body at all."""
+    client, decision_id = web
+    rv = client.post(f"/decisions/{decision_id}/approve")
+    assert rv.status_code == 200
+
+
+def test_post_promote_category_unknown_decision_returns_404(web):
+    """promote-category on a nonexistent decision id returns 404."""
+    client, _ = web
+    rv = client.post(
+        "/decisions/9999/promote-category",
+        json={
+            "new_category_slug": "garten",
+            "new_category_display_name": "Garten",
+            "person_slug": "timo",
+            "filename": "x.pdf",
+        },
+    )
+    assert rv.status_code == 404
+
+
+def test_post_promote_category_missing_field_returns_400(web):
+    """Missing required field in promote-category body returns 400 via KeyError."""
+    client, decision_id = web
+    rv = client.post(
+        f"/decisions/{decision_id}/promote-category",
+        json={"new_category_slug": "garten"},  # missing display_name, person_slug, filename
+    )
+    assert rv.status_code == 400
+
+
+def test_post_promote_category_unknown_person_returns_400(web):
+    """promote-category with an unknown person slug aborts with 400."""
+    client, decision_id = web
+    state = client.application.config["AIDO_STATE"]
+    rv = client.post(
+        f"/decisions/{decision_id}/promote-category",
+        json={
+            "new_category_slug": "garten",
+            "new_category_display_name": "Garten",
+            "person_slug": "nonexistent",
+            "filename": "x.pdf",
+        },
+    )
+    assert rv.status_code == 400
+    # No category created (the abort fires before promote_category runs).
+    from aido.store.taxonomy import get_category_by_slug
+
+    assert get_category_by_slug(state.mutations.conn, "garten") is None
+
+
+def test_post_promote_category_when_file_missing_returns_404(web):
+    """If the filed PDF is gone, promote-category surfaces FileNotFoundError as 404."""
+    client, decision_id = web
+    state = client.application.config["AIDO_STATE"]
+    d = get_decision(state.mutations.conn, decision_id)
+    Path(d.filed_path).unlink()
+    rv = client.post(
+        f"/decisions/{decision_id}/promote-category",
+        json={
+            "new_category_slug": "garten",
+            "new_category_display_name": "Garten",
+            "person_slug": "timo",
+            "filename": "x.pdf",
+        },
+    )
+    assert rv.status_code == 404
+
+
+def test_post_refile_when_file_missing_uses_filenotfound_branch(web):
+    """re-file surfaces missing-on-disk as 404 (FileNotFoundError handler)."""
+    # This duplicates test_refile_when_file_missing_returns_404 above but
+    # asserts the audit log stayed empty, isolating the error-path semantics.
+    client, decision_id = web
+    state = client.application.config["AIDO_STATE"]
+    d = get_decision(state.mutations.conn, decision_id)
+    Path(d.filed_path).unlink()
+    rv = client.post(
+        f"/decisions/{decision_id}/re-file",
+        json={
+            "person_slug": "anna",
+            "category_slug": "steuer",
+            "filename": "x.pdf",
+        },
+    )
+    assert rv.status_code == 404
+    assert list_actions_for_decision(state.mutations.conn, decision_id) == []
