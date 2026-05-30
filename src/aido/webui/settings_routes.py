@@ -31,7 +31,7 @@ def _state():
     return current_app.config["AIDO_STATE"]
 
 
-@bp.route("/settings")
+@bp.route("/settings", methods=["GET"])
 def settings_page() -> str:
     state = _state()
     with connect(state.db_path) as conn:
