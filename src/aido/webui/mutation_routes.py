@@ -19,6 +19,8 @@ from aido.store.taxonomy import get_category_by_slug
 
 bp = Blueprint("mutations", __name__)
 
+_UNKNOWN_DECISION = "Unknown decision"
+
 
 def _ctx() -> MutationContext:
     return current_app.config["AIDO_STATE"].mutations
@@ -56,7 +58,7 @@ def post_refile(decision_id: int):
     except KeyError as e:
         abort(400, description=f"Missing field: {e}")
     except ValueError as e:
-        if "Unknown decision" in str(e):
+        if _UNKNOWN_DECISION in str(e):
             abort(404)
         abort(400, description=str(e))
     return jsonify({"ok": True})
@@ -73,7 +75,7 @@ def post_rename(decision_id: int):
     except KeyError as e:
         abort(400, description=f"Missing field: {e}")
     except ValueError as e:
-        if "Unknown decision" in str(e):
+        if _UNKNOWN_DECISION in str(e):
             abort(404)
         abort(400, description=str(e))
     return jsonify({"ok": True})
@@ -85,7 +87,7 @@ def post_delete(decision_id: int):
     try:
         delete_decision(_ctx(), decision_id, note=body.get("note"))
     except ValueError as e:
-        if "Unknown decision" in str(e):
+        if _UNKNOWN_DECISION in str(e):
             abort(404)
         abort(400, description=str(e))
     return jsonify({"ok": True})
@@ -97,7 +99,7 @@ def post_approve(decision_id: int):
     try:
         approve(_ctx(), decision_id, note=body.get("note"))
     except ValueError as e:
-        if "Unknown decision" in str(e):
+        if _UNKNOWN_DECISION in str(e):
             abort(404)
         abort(400, description=str(e))
     return jsonify({"ok": True})
@@ -122,7 +124,7 @@ def post_promote(decision_id: int):
     except KeyError as e:
         abort(400, description=f"Missing field: {e}")
     except ValueError as e:
-        if "Unknown decision" in str(e):
+        if _UNKNOWN_DECISION in str(e):
             abort(404)
         abort(400, description=str(e))
     return jsonify({"ok": True})
