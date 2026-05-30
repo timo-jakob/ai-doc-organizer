@@ -11,6 +11,8 @@ from aido.store.taxonomy import list_categories
 
 bp = Blueprint("feed", __name__)
 
+_FEED_TEMPLATE = "feed.html"
+
 
 def _state():
     return current_app.config["AIDO_STATE"]
@@ -24,7 +26,7 @@ def index() -> str:
         pending = count_needs_review(conn)
         rows = _hydrate(conn, decisions)
     return render_template(
-        "feed.html",
+        _FEED_TEMPLATE,
         decisions=rows,
         title="Recently filed",
         needs_review_count=pending,
@@ -40,7 +42,7 @@ def needs_review() -> str:
         pending = count_needs_review(conn)
         rows = _hydrate(conn, decisions)
     return render_template(
-        "feed.html",
+        _FEED_TEMPLATE,
         decisions=rows,
         title="Needs review",
         needs_review_count=pending,
@@ -56,7 +58,7 @@ def all_decisions() -> str:
         pending = count_needs_review(conn)
         rows = _hydrate(conn, decisions)
     return render_template(
-        "feed.html",
+        _FEED_TEMPLATE,
         decisions=rows,
         title="All decisions",
         needs_review_count=pending,
