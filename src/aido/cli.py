@@ -119,22 +119,27 @@ def _cmd_status(args: argparse.Namespace) -> int:
     return 0
 
 
+def _seed_person(conn, entry: dict) -> None:
+    """Create one person and their aliases if the slug does not yet exist."""
+    slug = entry["slug"]
+    if get_person_by_slug(conn, slug) is not None:
+        return
+    person = create_person(
+        conn,
+        slug=slug,
+        display_name=entry["display_name"],
+        is_shared=bool(entry.get("is_shared", False)),
+    )
+    for alias in entry.get("aliases", []) or []:
+        add_alias(conn, person_id=person.id, alias=alias)
+
+
 def _seed_from_yaml(conn, seed_path: Path) -> None:
     yaml = YAML(typ="safe")
     data = yaml.load(seed_path.read_text(encoding="utf-8")) or {}
     with conn:
         for entry in data.get("persons", []) or []:
-            slug = entry["slug"]
-            if get_person_by_slug(conn, slug) is not None:
-                continue
-            person = create_person(
-                conn,
-                slug=slug,
-                display_name=entry["display_name"],
-                is_shared=bool(entry.get("is_shared", False)),
-            )
-            for alias in entry.get("aliases", []) or []:
-                add_alias(conn, person_id=person.id, alias=alias)
+            _seed_person(conn, entry)
         for entry in data.get("categories", []) or []:
             slug = entry["slug"]
             if get_category_by_slug(conn, slug) is None:
