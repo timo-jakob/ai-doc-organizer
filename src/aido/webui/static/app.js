@@ -1,5 +1,5 @@
 // Minimal helpers. Real interaction lives in templates' inline scripts.
-window.aido = {
+globalThis.aido = {
   postJSON: async function (url, body) {
     const r = await fetch(url, {
       method: "POST",
