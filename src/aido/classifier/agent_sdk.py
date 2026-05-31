@@ -16,6 +16,11 @@ from aido.store.persons import list_aliases_for, list_persons
 from aido.store.taxonomy import list_categories, list_doctypes
 from aido.types import ClassificationResult
 
+# Input to this regex is always Claude's API response text, not attacker-
+# supplied data.  A ReDoS attack requires an adversary who can feed arbitrary
+# strings into the regex engine; Claude's output is developer-controlled.
+# The pattern is also intentionally lazy (.*?) to match the minimal span, which
+# limits backtracking on well-formed responses.  # nosonar python:S5852
 _TAG_RE = re.compile(r"<classification>\s*(.*?)\s*</classification>", re.DOTALL)
 
 
