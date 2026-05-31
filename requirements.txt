@@ -5,7 +5,7 @@
 #
 # Keep in sync with pyproject.toml when adding/removing/bumping deps.
 
-claude-agent-sdk>=0.1.0
+claude-agent-sdk>=0.2.87
 anthropic>=0.104.0
 pypdf>=6.0.0
 watchdog>=6.0.0
