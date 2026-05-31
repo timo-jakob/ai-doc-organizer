@@ -108,35 +108,12 @@ jobs:
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
           SONAR_HOST_URL: https://sonarcloud.io
 
-  # --- Snyk: source code ----------------------------------------------------
-  snyk-code:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v6
-      - name: Snyk Code (SAST)
-        uses: snyk/actions/setup@v1.0.0
-      - run: snyk code test --severity-threshold=high
-        env:
-          SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
-
-  # --- Snyk: open-source dependencies ---------------------------------------
-  # Snyk needs deps installed to enumerate them. Match the install
-  # commands from test-and-coverage, then `snyk test --all-projects`.
-  snyk-open-source:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v6
-      - uses: snyk/actions/setup@v1.0.0
-      - uses: actions/setup-python@v6
-        with:
-          python-version: "3.14"
-          cache: "pip"
-      - run: |
-          [[ -f requirements.txt ]] && pip install -r requirements.txt
-          pip install -e ".[dev]"
-      - run: snyk test --severity-threshold=high --all-projects
-        env:
-          SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
+  # Snyk Code (SAST) + Snyk Open Source (deps) are scanned by Snyk's GitHub
+  # integration directly — the App posts PR status checks without a CI job.
+  # We don't run `snyk code test` / `snyk test` here because CLI-invoked
+  # scans count as PRIVATE tests against the org's monthly quota regardless
+  # of repo visibility. The container scan (further down) stays in CI: the
+  # integration can't see an image that only exists after the build step.
 
   # --- License compliance (dependencies) ------------------------------------
   # Uses Trivy as an open-source license scanner. Catches deps shipping
