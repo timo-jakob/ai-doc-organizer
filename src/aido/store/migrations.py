@@ -24,7 +24,7 @@ def init_db(conn: sqlite3.Connection) -> None:
             # queries are not applicable to DDL. S3649 is a false positive here.
             conn.executescript(
                 _SCHEMA_PATH.read_text(encoding="utf-8")
-            )  # NOSONAR(pythonsecurity:S3649)
+            )  # nosonar pythonsecurity:S3649
             conn.execute(
                 "INSERT INTO schema_version(version, applied_at) VALUES (?, ?)",
                 (SCHEMA_VERSION, datetime.now(UTC).isoformat()),
