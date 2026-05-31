@@ -22,9 +22,8 @@ def init_db(conn: sqlite3.Connection) -> None:
             # developer-controlled DDL asset, never derived from user input or runtime config.
             # executescript() is the only SQLite3 API for multi-statement DDL; parameterised
             # queries are not applicable to DDL. S3649 is a false positive here.
-            conn.executescript(
-                _SCHEMA_PATH.read_text(encoding="utf-8")
-            )  # nosonar pythonsecurity:S3649
+            ddl = _SCHEMA_PATH.read_text(encoding="utf-8")
+            conn.executescript(ddl)  # NOSONAR pythonsecurity:S3649
             conn.execute(
                 "INSERT INTO schema_version(version, applied_at) VALUES (?, ?)",
                 (SCHEMA_VERSION, datetime.now(UTC).isoformat()),
