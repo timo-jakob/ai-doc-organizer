@@ -22,6 +22,12 @@ class WebState:
 
 
 def create_app(state: WebState) -> Flask:
+    # CSRF protection is not needed here: all mutation endpoints consume
+    # application/json (browsers cannot send cross-origin JSON POST without a
+    # CORS preflight), no session cookies are used, and there is no Flask-WTF
+    # form infrastructure.  This is a local-network REST API — not a
+    # traditional server-rendered form app.  SONAR S4502 is a false positive
+    # for this architecture.  # nosonar python:S4502
     app = Flask(__name__, template_folder="templates", static_folder="static")
     app.config["AIDO_STATE"] = state
 
