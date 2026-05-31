@@ -30,7 +30,7 @@ def extract_text(path: Path, *, max_chars: int = DEFAULT_MAX_CHARS) -> tuple[str
     """
     try:
         reader = PdfReader(str(path))
-    except (PdfReadError, PyPdfError, ValueError, OSError):
+    except PdfReadError, PyPdfError, ValueError, OSError:
         return "", ExtractStatus.UNREADABLE
 
     if getattr(reader, "is_encrypted", False):

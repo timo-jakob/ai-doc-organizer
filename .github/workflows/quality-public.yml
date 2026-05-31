@@ -58,7 +58,7 @@ jobs:
       - name: Setup Python
         uses: actions/setup-python@v6
         with:
-          python-version: "3.13"
+          python-version: "3.14"
           cache: "pip"
 
       - name: Install system dependencies (OCR + PDF)
@@ -129,7 +129,7 @@ jobs:
       - uses: snyk/actions/setup@v1.0.0
       - uses: actions/setup-python@v6
         with:
-          python-version: "3.13"
+          python-version: "3.14"
           cache: "pip"
       - run: |
           [[ -f requirements.txt ]] && pip install -r requirements.txt
@@ -300,5 +300,5 @@ jobs:
           fetch-depth: 0
       - uses: actions/setup-python@v6
         with:
-          python-version: "3.13"
+          python-version: "3.14"
       - uses: pre-commit/action@v3.0.1
