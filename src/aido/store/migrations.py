@@ -17,11 +17,14 @@ def init_db(conn: sqlite3.Connection) -> None:
     ).fetchone()
     if row is None:
         with conn:
-            # _SCHEMA_PATH is a package-internal DDL file (schema.sql) resolved relative
-            # to this module's location — it is developer-controlled, not user-supplied.
-            # executescript() is required for multi-statement DDL and does not support
-            # parameterised queries; the input source is not external/user data.
-            conn.executescript(_SCHEMA_PATH.read_text(encoding="utf-8"))  # nosonar
+            # _SCHEMA_PATH is a module-level constant (Path(__file__).parent / "schema.sql"),
+            # resolved at import time relative to this source file — it is a bundled,
+            # developer-controlled DDL asset, never derived from user input or runtime config.
+            # executescript() is the only SQLite3 API for multi-statement DDL; parameterised
+            # queries are not applicable to DDL. S3649 is a false positive here.
+            conn.executescript(
+                _SCHEMA_PATH.read_text(encoding="utf-8")
+            )  # NOSONAR(pythonsecurity:S3649)
             conn.execute(
                 "INSERT INTO schema_version(version, applied_at) VALUES (?, ?)",
                 (SCHEMA_VERSION, datetime.now(UTC).isoformat()),
