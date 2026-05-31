@@ -30,7 +30,9 @@ def extract_text(path: Path, *, max_chars: int = DEFAULT_MAX_CHARS) -> tuple[str
     """
     try:
         reader = PdfReader(str(path))
-    except PdfReadError, PyPdfError, ValueError, OSError:
+    # ruff 0.15.x with target-version=py314 incorrectly rewrites
+    # `except (A, B, C):` to `except A, B, C:` (invalid Python 3); fmt: skip prevents it.
+    except (PdfReadError, PyPdfError, ValueError, OSError):  # fmt: skip
         return "", ExtractStatus.UNREADABLE
 
     if getattr(reader, "is_encrypted", False):
