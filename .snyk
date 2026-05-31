@@ -63,4 +63,37 @@ ignore:
         reason: Base-image CVE (zlib transitive); awaiting Debian patch.
         expires: "2026-08-23T00:00:00.000Z"
         created: "2026-05-25T00:00:00.000Z"
+  # --- New entries (2026-05-31): surfaced after the 3.13 → 3.14 base-image
+  # bump pulled in updated apt indexes. Same pattern as above — base-image
+  # CVEs from python:3.14-slim-bookworm, fixable only by Debian.
+  SNYK-DEBIAN12-PERL-17037370:
+    - "*":
+        reason: Base-image CVE (perl-base in bookworm); awaiting Debian patch.
+        expires: "2026-08-29T00:00:00.000Z"
+        created: "2026-05-31T00:00:00.000Z"
+  SNYK-DEBIAN12-PERL-17037423:
+    - "*":
+        reason: Base-image CVE (perl-base in bookworm); awaiting Debian patch.
+        expires: "2026-08-29T00:00:00.000Z"
+        created: "2026-05-31T00:00:00.000Z"
+  SNYK-DEBIAN12-PERL-17037435:
+    - "*":
+        reason: Base-image CVE (perl-base in bookworm); awaiting Debian patch.
+        expires: "2026-08-29T00:00:00.000Z"
+        created: "2026-05-31T00:00:00.000Z"
+  SNYK-DEBIAN12-GNUTLS28-16344335:
+    - "*":
+        reason: Base-image CVE (gnutls28/libgnutls30); awaiting Debian patch.
+        expires: "2026-08-29T00:00:00.000Z"
+        created: "2026-05-31T00:00:00.000Z"
+  SNYK-DEBIAN12-GNUTLS28-16344348:
+    - "*":
+        reason: Base-image CVE (gnutls28/libgnutls30); awaiting Debian patch.
+        expires: "2026-08-29T00:00:00.000Z"
+        created: "2026-05-31T00:00:00.000Z"
+  SNYK-DEBIAN12-GNUTLS28-16344358:
+    - "*":
+        reason: Base-image CVE (gnutls28/libgnutls30); awaiting Debian patch.
+        expires: "2026-08-29T00:00:00.000Z"
+        created: "2026-05-31T00:00:00.000Z"
 patch: {}
