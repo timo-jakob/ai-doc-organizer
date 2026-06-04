@@ -31,12 +31,11 @@ on:
     - cron: "0 6 * * 1"
   workflow_dispatch:
 
+# Least-privilege workflow defaults. The `image` job widens its own
+# permissions for GHCR push + cosign keyless signing; nothing else
+# needs anything beyond `contents: read`.
 permissions:
   contents: read
-  pull-requests: write
-  security-events: write
-  packages: write          # required for ghcr.io push
-  id-token: write          # required for cosign keyless OIDC signing
 
 concurrency:
   group: quality-${{ github.ref }}
@@ -76,6 +75,25 @@ jobs:
           pip install -e ".[dev]"
           pip install pytest-cov
           pytest --cov --cov-report=xml --cov-report=term
+
+      # Local mirror of the diff-cover pre-push hook: enforce 90% coverage
+      # on new lines vs origin/main. PR-only because there's no "new code"
+      # diff to compute on push to the default branch. Uses the cobertura
+      # coverage.xml produced above.
+      #
+      # BASE_REF is funnelled through env: rather than inlined into the
+      # run: script to keep semgrep's run-shell-injection rule happy —
+      # github context values are untrusted input.
+      - name: Coverage floor — 90% on new code
+        if: github.event_name == 'pull_request'
+        env:
+          BASE_REF: ${{ github.base_ref }}
+        run: |
+          pip install 'diff-cover>=9'
+          diff-cover coverage.xml \
+            --compare-branch="origin/${BASE_REF}" \
+            --fail-under=90 \
+            --show-uncovered
 
       - name: Upload coverage artifact
         uses: actions/upload-artifact@v7
@@ -139,6 +157,10 @@ jobs:
   # push to main / release  → build linux/amd64 + linux/arm64, scan, push to GHCR
   image:
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write    # ghcr.io push
+      id-token: write    # cosign keyless OIDC signing
     steps:
       - uses: actions/checkout@v6
 
@@ -171,7 +193,11 @@ jobs:
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
           cache-from: type=gha
-          cache-to: type=gha,mode=max
+          # mode=min on the PR build: only the final layer is cached, so a
+          # malicious fork PR can't poison intermediate layer keys that a
+          # later push from the trusted ref would consume. The push build
+          # below uses mode=max because it's already gated to trusted events.
+          cache-to: type=gha,mode=min
 
       - name: Pick a tag for scanning
         id: pick
@@ -221,7 +247,7 @@ jobs:
 
       - name: Export SBOM as CI artifact
         if: github.event_name == 'push' || github.event_name == 'release'
-        uses: anchore/sbom-action@v0
+        uses: anchore/sbom-action@v0.24.0
         with:
           image: ${{ steps.pick.outputs.tag }}
           format: cyclonedx-json
@@ -230,7 +256,7 @@ jobs:
       - name: Validate SBOM is well-formed CycloneDX
         if: github.event_name == 'push' || github.event_name == 'release'
         run: |
-          docker run --rm -v "$PWD:/work" cyclonedx/cyclonedx-cli:latest \
+          docker run --rm -v "$PWD:/work" cyclonedx/cyclonedx-cli:v0.32.0 \
             validate --input-file /work/sbom.cdx.json --input-format json --fail-on-errors
 
       - name: Upload SBOM artifact
@@ -259,7 +285,9 @@ jobs:
   semgrep:
     runs-on: ubuntu-latest
     container:
-      image: returntocorp/semgrep
+      # Pinned; bump in lockstep with the semgrep entry in
+      # .pre-commit-config.yaml so local + CI behave identically.
+      image: returntocorp/semgrep:1.163.0
     steps:
       - uses: actions/checkout@v6
       - run: semgrep ci --config=auto

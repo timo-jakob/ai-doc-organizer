@@ -4,38 +4,76 @@ The bootstrap skill wrote the config files and workflows. Some setup steps
 require human action — account creation, token storage, runner registration —
 and are listed below.
 
+> Sections marked **PUBLIC** apply only to public repositories using SonarCloud
+> + Snyk. Sections marked **PRIVATE** apply only to private repositories using
+> self-hosted SonarQube + Trivy. Sections without a label apply to both.
+
+> 🤖 **macOS users**: most of these steps can be automated. The bootstrap skill
+> offers to run `scripts/automate-public.sh` or `scripts/automate-private.sh`
+> after generating files. The manual instructions below remain useful as a
+> reference for what the automation does, and as a fallback for non-macOS
+> hosts or non-Homebrew workflows.
+
 ---
 
 ## 1. Install local toolchain
 
 ```sh
-# pre-commit framework
-pip install pre-commit
-# or
+# pre-commit framework — brew is the recommended path; pre-commit manages
+# its own per-hook virtualenvs, so it doesn't need to live in your project venv.
 brew install pre-commit
+# or, into an active venv (pip must be on PATH):
+#   pip install pre-commit
 
 pre-commit install
 pre-commit run --all-files   # initial run, may take a minute
 ```
 
-Python tooling:
+Language-specific tools — install only what you use:
 
-```sh
-pip install ruff pytest pytest-cov coverage
-# or, with the project's dev extras (after `pytest-cov` is added):
-pip install -e ".[dev]"
-```
+| Language | Tools |
+|---|---|
+| Swift | `brew install swiftlint swiftformat` |
+| TypeScript / JavaScript | Tools come from `package.json`; run `npm install` |
+| Python | `pip install ruff pytest coverage` (or use `uv` / `poetry`) |
+| Go | `brew install golangci-lint` |
 
 Cross-language:
 
 ```sh
 brew install gitleaks
 brew install semgrep         # or: pip install semgrep
+brew install trivy           # PRIVATE only — for local container scanning
 ```
 
 ---
 
-## 2. SonarCloud setup
+## 2. **PUBLIC** — SonarCloud setup
+
+> 🤖 **Automated alternative**: `scripts/automate-public.sh` runs most of
+> section 2 end-to-end. Run it after `preflight.sh` confirms your toolchain.
+>
+> **Steps the script runs for you (no input needed)**: SonarCloud org-slug
+> resolution, Quality Gate creation (or 'Sonar way' fallback if your plan
+> doesn't allow custom gates), GitHub Actions secret writes (`SONAR_TOKEN`,
+> `SNYK_TOKEN`), **GitHub Security features** (Dependabot alerts, automated
+> security fixes, secret scanning + push protection, Private Vulnerability
+> Reporting — all free on public), Snyk monitor onboarding (optional Y/N
+> prompt), branch protection (optional Y/N prompt).
+>
+> **Interactive steps the script will pause for**:
+>
+> | When | What you do |
+> |---|---|
+> | At start | Browser opens to <https://sonarcloud.io/projects/create>. Sign in via GitHub, click "Analyze new project", select this repo, complete the import flow. (The script waits at a "Paste SONAR_TOKEN:" prompt while you do this.) |
+> | After token paste | Generate a **user token** (not project-analysis) at <https://sonarcloud.io/account/security>, paste it into the terminal. |
+> | After Quality Gate creation attempt | None — script auto-falls-back to 'Sonar way' if your plan returns 403 (Free plan typical). |
+> | At Snyk auth | If Snyk isn't already authed locally, browser opens for `snyk auth --auth-type=token`. Approve, return to terminal. |
+> | At `snyk monitor` prompt | Y/N — recommend Y for continuous monitoring on snyk.io. |
+> | At branch-protection prompt | Y/N — defer to **N** until your bootstrap PR has merged so you don't lock yourself out. |
+>
+> Total interactive time: ~3-5 minutes. The script's other operations
+> total ~30 seconds.
 
 ### 2.1 Create the project
 
@@ -52,7 +90,7 @@ In repo Settings → Secrets and variables → Actions → New repository secret
 |---|---|---|
 | `SONAR_TOKEN` | Yes | from step 2.1 |
 | `SNYK_TOKEN` | Yes | from step 2.5 below |
-| `SEMGREP_APP_TOKEN` | **Optional** | only needed if you connect Semgrep AppSec Platform for managed rules / dashboards. CI runs the free OSS ruleset without it. |
+| `SEMGREP_APP_TOKEN` | **Optional** | only needed if you connect Semgrep AppSec Platform for managed rules / dashboards. CI runs the free OSS ruleset without it; the env var is read defensively (`${{ secrets.SEMGREP_APP_TOKEN }}`) and won't fail when unset. |
 
 ### 2.3 Create the Zero Tolerance Quality Gate
 
@@ -60,7 +98,7 @@ In repo Settings → Secrets and variables → Actions → New repository secret
 # Set these once for the snippet below:
 export SONAR_TOKEN=<the token from 2.1>
 export SONAR_HOST=https://sonarcloud.io
-export ORG_KEY=timo-jakob
+export ORG_KEY=timo-jakob-github
 export PROJECT_KEY=timo-jakob_ai-doc-organizer
 
 # Create the gate
@@ -109,26 +147,147 @@ a score to <https://scorecard.dev/viewer/?uri=github.com/timo-jakob/ai-doc-organ
 Nothing to set up — the workflow uses GitHub's OIDC token to publish, no
 secrets needed.
 
-**Add the badge to your README** (optional but recommended):
+After the first scheduled run (or push to `main`), the score
+is available in three places:
+
+- `https://scorecard.dev/viewer/?uri=github.com/timo-jakob/ai-doc-organizer` — public landing page with per-check breakdown
+- The repo's **Security** tab → **Code scanning** → filter by tool "Scorecard"
+- The **Actions** run summary
+
+**Add the badge to your README** (optional but recommended for OSS):
 
 ```markdown
 [![OpenSSF Scorecard](https://api.scorecard.dev/projects/github.com/timo-jakob/ai-doc-organizer/badge)](https://scorecard.dev/viewer/?uri=github.com/timo-jakob/ai-doc-organizer)
 ```
 
+The score is **not gated as a required check** — Scorecard is a periodic
+informational signal, not a per-PR gate. Improvements should happen
+through normal PRs that address whichever specific checks are red (the
+Code scanning view shows each failing check with a fix recommendation).
+
 ### 2.5 Sign up for Snyk
 
 1. Go to [snyk.io](https://snyk.io), sign in with GitHub.
 2. Account Settings → Auth Token → copy.
-3. Add as repo secret `SNYK_TOKEN` (already listed in 2.2 above).
+3. Add as repo secret `SNYK_TOKEN`.
 4. (Optional) Import the repo in Snyk's UI to enable PR comments.
 
 ---
 
-## 3. License compliance policy
+## 3. **PRIVATE** — SonarQube + Trivy setup
 
-The `license-fs` and `license-image` (inside the `image` job) jobs run
-Trivy in license-only mode and gate merges on `CRITICAL,HIGH` severity.
-Trivy classifies licenses into categories:
+> 🤖 **Automated alternative**: `scripts/automate-private.sh` runs most of
+> section 3 end-to-end. Run it after `preflight.sh` confirms your toolchain.
+>
+> **Steps the script runs for you (no input needed)**: `docker compose up`
+> for SonarQube CE + Postgres, health-check polling until SonarQube is up,
+> random admin password generation stored in macOS Keychain, password change
+> from default `admin/admin` via API, project creation, analysis token mint,
+> Quality Gate creation (or fallback), GitHub Actions secret writes
+> (`SONAR_TOKEN`, `SONAR_HOST_URL`), **Dependabot alerts + automated security
+> fixes** (the two free-on-private toggles). Secret scanning, push protection,
+> and Private Vulnerability Reporting require GitHub Advanced Security on
+> private repos — flip those manually if your org has GHAS.
+>
+> **Interactive steps the script will pause for**:
+>
+> | When | What you do |
+> |---|---|
+> | At self-hosted runner prompt | Y/N — Y to download + register the GitHub Actions runner as a launchd service on this machine. |
+> | If runner accepted | Browser tab opens at the GitHub Settings → Actions → Runners page. The script reads back a registration token via `gh api` — no copy/paste from you. |
+> | At branch-protection prompt | Y/N — defer to **N** until your bootstrap PR has merged. |
+>
+> Total interactive time: ~1-2 minutes (most of which is waiting for
+> SonarQube to start). The script's other operations total ~30 seconds.
+
+### 3.1 Start SonarQube (self-hosted)
+
+```sh
+cd infra/sonarqube
+docker compose up -d
+```
+
+Wait ~30 seconds, then open <http://localhost:9000>.
+
+Default login: `admin` / `admin`. SonarQube will force a password change on
+first login — pick something strong and store it somewhere safe.
+
+### 3.2 Create the project and mint a token
+
+In SonarQube UI:
+1. **Create project** → manual → key: `timo-jakob_ai-doc-organizer` → name: `ai-doc-organizer`.
+2. Choose **With GitHub Actions** as the analysis method.
+3. Generate a **Project Analysis Token** — copy it. This is your `SONAR_TOKEN`.
+
+### 3.3 Register a self-hosted runner
+
+> Self-hosted runners may **only** be used on **private** repositories. Public
+> repos are not safe for self-hosted runners (forks can run arbitrary code).
+
+See `infra/github-runner/README.md` for full instructions. Summary:
+
+1. In GitHub: repo Settings → Actions → Runners → New self-hosted runner.
+2. Follow the copy-pasted commands on the host running SonarQube.
+3. Run `./svc.sh install && ./svc.sh start` so it runs as a service.
+4. Confirm the runner shows as "Idle" in GitHub Settings → Actions → Runners.
+
+### 3.4 Add GitHub Actions secrets
+
+In repo Settings → Secrets and variables → Actions → New repository secret:
+
+| Name | Value |
+|---|---|
+| `SONAR_TOKEN` | from step 3.2 |
+| `SONAR_HOST_URL` | URL reachable from the runner host (e.g., `http://localhost:9000` if the runner is on the same machine) |
+
+### 3.5 Create the Zero Tolerance Quality Gate
+
+The API is the same as SonarCloud but without `organization`:
+
+```sh
+export SONAR_TOKEN=<token from 3.2>
+export SONAR_HOST=http://localhost:9000
+export PROJECT_KEY=timo-jakob_ai-doc-organizer
+
+GATE_ID=$(curl -sS -u "$SONAR_TOKEN:" -X POST \
+  "$SONAR_HOST/api/qualitygates/create?name=Zero%20Tolerance" \
+  | python3 -c 'import sys,json;print(json.load(sys.stdin)["id"])')
+
+add() {
+  curl -sS -u "$SONAR_TOKEN:" -X POST \
+    "$SONAR_HOST/api/qualitygates/create_condition" \
+    --data-urlencode "gateId=$GATE_ID" \
+    --data-urlencode "metric=$1" \
+    --data-urlencode "op=$2" \
+    --data-urlencode "error=$3" > /dev/null
+  echo "  + $1 $2 $3"
+}
+
+add new_coverage              LT  90
+add new_code_smells           GT  0
+add new_bugs                  GT  0
+add new_vulnerabilities       GT  0
+add new_security_hotspots_reviewed LT 100
+add new_reliability_rating    GT  1
+add new_security_rating       GT  1
+add new_maintainability_rating GT 1
+add new_security_review_rating GT  1
+add new_duplicated_lines_density GT 3
+
+curl -sS -u "$SONAR_TOKEN:" -X POST \
+  "$SONAR_HOST/api/qualitygates/select" \
+  --data-urlencode "gateName=Zero Tolerance" \
+  --data-urlencode "projectKey=$PROJECT_KEY"
+```
+
+---
+
+## 3b. License compliance policy
+
+The `license-fs` and (if you have a Dockerfile) `license-image` jobs run
+Trivy in license-only mode and gate merges on the same `CRITICAL,HIGH`
+severity bar as vulnerability scanning. Trivy classifies licenses into
+categories with an assigned severity:
 
 | Category | Examples | Default severity | Default CI behaviour |
 |---|---|---|---|
@@ -136,116 +295,382 @@ Trivy classifies licenses into categories:
 | Restricted | GPL-2.0, GPL-3.0, LGPL-2.1, LGPL-3.0 | MEDIUM | Reported, does not block |
 | Reciprocal | MPL-2.0, EPL-2.0 | LOW | Reported, does not block |
 | Notice / Permissive | Apache-2.0, MIT, BSD, ISC | LOW | Reported, does not block |
+| Unknown | unrecognized | UNKNOWN | Reported, does not block |
 
-You've chosen **MIT** for this project. MIT is compatible with all permissive
-licenses (Apache-2.0, BSD, ISC) and reciprocal/restricted licenses (MPL, LGPL,
-GPL) at the dep level. If you ever consider relicensing, customize
-`trivy.yaml` to gate stricter rules — there's a commented `license:` block.
+This is the **default policy**. If your project license requires stricter
+rules (e.g., an Apache-2.0 codebase can't include GPL deps), customize
+`trivy.yaml` — there's a commented `license:` block showing how to move
+specific licenses into `forbidden:` so they fail CI.
+
+A note on **your project's own license** vs **your dependencies' licenses**:
+the gates above check what comes *in* — they don't validate that your
+chosen LICENSE file is compatible with your deps' licenses. That's a
+human/legal judgment. Common pairings:
+
+- **MIT / Apache-2.0 / BSD project** → use any permissive dep; avoid GPL/AGPL deps.
+- **GPL-licensed project** → can use permissive AND GPL deps; cannot use AGPL deps unless you're prepared to be AGPL.
+- **Proprietary / private project** → typically forbids GPL, LGPL, and AGPL deps. Tighten Trivy's `forbidden:` list to enforce.
 
 ---
 
-## 4. Weekly drift scan
+## 3c. Weekly drift scan
 
-The quality workflow runs on a weekly schedule (Monday 06:00 UTC) in
-addition to PR + push triggers. Vulnerability and license databases
-update continuously; the weekly schedule means newly-disclosed CVEs
-surface within ~7 days, even when no PR touches the affected area.
+The quality workflows run on a weekly schedule (Monday 06:00 UTC) in
+addition to PR + push triggers. Same jobs, fresh data.
 
-## 5. Dependabot — what's tracked
+**Why this matters**: vulnerability and license databases update
+continuously. A dep you pinned six months ago and last scanned at PR-time
+may have had a CVE disclosed against it last week. Without a scheduled
+re-run, you'd only learn about it the next time a PR happens to touch the
+affected area. The weekly schedule guarantees you find out within ~7 days.
 
-`.github/dependabot.yml` opens weekly grouped PRs for:
+If a scheduled run fails, GitHub Actions sends an email to anyone with
+"Send notifications for failed workflows" enabled in their notification
+settings. For a stricter posture, add a "create issue on failure" step to
+the workflow — leaving it as default email keeps the noise low.
+
+## 3d. Dependabot — what's tracked
+
+Dependabot has two related features. The bootstrap automate scripts turn
+both on for you (free on both public and private repos):
+
+| Feature | What it does | API endpoint |
+|---|---|---|
+| **Dependabot alerts** | Flags known-vulnerable dependencies in your Security tab | `PUT /repos/{o}/{r}/vulnerability-alerts` |
+| **Automated security fixes** | Opens PRs that bump vulnerable deps to a patched version | `PUT /repos/{o}/{r}/automated-security-fixes` |
+| **Dependabot version updates** | Weekly PRs to keep deps current — drives the `.github/dependabot.yml` config below | (declarative, no API call) |
+
+> 🤖 The first two are GitHub-side toggles enabled by `automate-public.sh`
+> and `automate-private.sh`. If you ran a script, both are on. To verify,
+> see repo Settings → Code security and analysis.
+
+The generated `.github/dependabot.yml` opens weekly grouped PRs for:
 
 | Ecosystem | What it tracks |
 |---|---|
 | `github-actions` | Actions versions in `.github/workflows/*.yml` |
-| `pip` | `requirements.txt` / `pyproject.toml` |
-| `docker` | `FROM` lines in your Dockerfile(s) |
+| `npm` | `package.json` (TypeScript projects) |
+| `pip` | `requirements.txt` / `pyproject.toml` (Python projects) |
+| `gomod` | `go.mod` (Go projects) |
+| `swift` | `Package.swift` (Swift projects) |
+| `docker` | `FROM` lines in your Dockerfile(s) (if generated with `has_dockerfile=true`) |
 
-Minor and patch updates are grouped into a single PR per ecosystem.
-Major version updates always open as separate PRs.
+Minor and patch updates are grouped into a single PR per ecosystem to keep
+the inbox manageable. Major version updates always open as separate PRs
+because they usually need code changes.
 
-## 6. Security disclosure — enable Private Vulnerability Reporting
+If you add a new Dockerfile after the initial bootstrap, re-run the
+bootstrap skill or manually append a `package-ecosystem: "docker"` block
+to `dependabot.yml`.
 
-`.github/SECURITY.md` directs reporters to **GitHub Security Advisories
-(GHSA)**. Confirm it's enabled:
+## 3e. Security disclosure — enable Private Vulnerability Reporting
+
+The generated `.github/SECURITY.md` directs reporters to **GitHub Security
+Advisories (GHSA)** as the preferred private channel.
+
+> 🤖 **`automate-public.sh` enables Private Vulnerability Reporting via
+> the GitHub API for you** (the `PUT /repos/{owner}/{repo}/private-vulnerability-reporting`
+> endpoint). If you ran the automate script, this is already on — verify in
+> repo Settings → Code security and analysis.
+
+If you're setting things up manually:
 
 1. Repo Settings → **Code security and analysis**.
 2. Find **Private vulnerability reporting** → click **Enable**.
 
-## 7. Push protection — block secrets at the server
+What this gives you:
+- A "Report a vulnerability" button on the repo's Security tab.
+- A private discussion area between reporter and maintainers.
+- Built-in CVE assignment workflow when a fix is published.
 
-GitHub's **secret scanning + push protection** rejects any `git push`
-containing a detected token at the server. **Free and on by default** for
-public repos since 2024. Confirm: Settings → Code security and analysis →
-"Push protection" should be on.
+For **private repos** the same feature is available but generally requires
+GitHub Advanced Security. If you can't enable it, the email fallback in
+`SECURITY.md` (configured during bootstrap) becomes your primary channel.
+
+Review `.github/SECURITY.md` before publishing — supported versions, response
+timelines, and the out-of-scope list should match what you can actually
+commit to. Defaults are calibrated to be realistic for a small project; tune
+them down (or up) if you have different bandwidth.
 
 ---
 
-## 8. GitHub branch protection on `main`
+## 3f. Push protection — block secrets at the server
+
+GitHub's **secret scanning + push protection** rejects any `git push`
+containing a detected token (AWS key, GitHub PAT, Stripe key, OpenAI key,
+~200+ patterns) *at the server*. It's the line of defense after pre-commit
+gitleaks and before CI sees the push, and it's the only one that can save
+you if someone uses `git push --no-verify` to bypass pre-commit and the
+secret was real.
+
+> 🤖 **`automate-public.sh` enables secret scanning + push protection
+> for you** via the `PATCH /repos/{owner}/{repo}` endpoint with
+> `security_and_analysis.secret_scanning.status = enabled` and
+> `security_and_analysis.secret_scanning_push_protection.status = enabled`.
+> Free on public; on private repos this requires GitHub Advanced Security
+> (the private automate script skips it and prints a note).
+
+| Repo visibility | Cost | How to enable |
+|---|---|---|
+| **Public** | Free, **on by default** since 2024 | Repo Settings → Code security and analysis → confirm "Push protection" is on |
+| **Private** | **Requires GitHub Advanced Security (paid)** | Settings → Code security and analysis → Enable secret scanning + Enable push protection |
+
+For private repos without Advanced Security, the practical workaround is
+to rely on pre-commit gitleaks + a strict no-`--no-verify` policy and an
+incident runbook for token rotation if a secret leaks anyway.
+
+**What happens when push protection triggers**: the push is rejected with
+a clear message identifying the suspected secret and the line it appears
+on. The contributor can either:
+
+1. Remove the secret and retry the push (recommended).
+2. Mark the finding as a false positive in the GitHub UI, which produces
+   a one-time bypass URL.
+3. Confirm it really is a secret that needs to be committed (extremely
+   rare — usually means the architecture is wrong; secrets belong in
+   GitHub Actions secrets, not the repo).
+
+If a real secret slipped through (e.g., from a fork or before push
+protection was enabled), follow GitHub's [token revocation
+guide](https://docs.github.com/en/code-security/secret-scanning/managing-alerts-from-secret-scanning)
+and rotate the credential at its source. Removing the secret from git
+history is not enough — assume the moment it touched a public commit, it
+was scraped.
+
+---
+
+## 3g. Signed commits (only if bootstrap ran with `--signed-commits`)
+
+If bootstrap was invoked with `--signed-commits`, the branch protection
+rule on `main` requires every landing commit to be
+cryptographically signed (GPG or SSH key) and verified by GitHub.
+
+**This adds setup friction for every contributor** — a one-time
+key-generation-and-registration step per machine. The payoff is that
+"Author: X" lines on `main` become evidence rather than
+unverified claims.
+
+### Per-contributor setup (SSH key — recommended)
+
+SSH signing is simpler than GPG and reuses keys you already have. If
+you're authenticating to GitHub over SSH, you can use the same key for
+commit signing.
+
+```sh
+# Confirm you have an SSH key (or generate one with `ssh-keygen -t ed25519`)
+ls ~/.ssh/id_*.pub
+
+# Tell git to use SSH for signing, with your public key
+git config --global gpg.format ssh
+git config --global user.signingkey ~/.ssh/id_ed25519.pub
+
+# Sign every commit by default
+git config --global commit.gpgsign true
+```
+
+Then **add the same public key to GitHub as a signing key** (not just an
+authentication key):
+
+1. GitHub → Settings → SSH and GPG keys → New SSH key.
+2. Key type: **Signing Key** (separate from Authentication keys).
+3. Paste the contents of `~/.ssh/id_ed25519.pub`.
+
+After this, every push will appear with a green "Verified" badge in the
+GitHub UI. Pushes from a machine without the registered key will be
+rejected by the branch protection rule.
+
+### Per-contributor setup (GPG key — alternative)
+
+If your organization already uses GPG, follow GitHub's
+[GPG signing guide](https://docs.github.com/en/authentication/managing-commit-signature-verification/signing-commits).
+Same workflow, more setup steps; the resulting verification is equivalent.
+
+### What if the rule is too strict?
+
+Disable it on `main`:
+
+```sh
+# Re-run branch-protection.sh without the flag
+"<skill-base-dir>/scripts/branch-protection.sh" \
+  --visibility <public|private> \
+  --has-dockerfile <true|false> \
+  --has-codeql <true|false> \
+  --default-branch main
+  # (note: --require-signed-commits omitted — defaults to false)
+```
+
+The script idempotently clears the signature requirement when run
+without the flag.
+
+---
+
+## 4. GitHub branch protection on `main`
+
+> 🤖 **Automated alternative**: `scripts/branch-protection.sh` applies the rules
+> below in one call. The automation scripts above invoke it automatically;
+> you can also run it standalone.
 
 The bootstrap skill offers to apply these automatically via `gh api`. If you
 want to do it manually: repo Settings → Branches → Add rule for `main`:
 
 - [x] Require a pull request before merging (1 approval, dismiss stale reviews)
-- [x] Require status checks to pass before merging:
-  - `sonarcloud`, `snyk-open-source`, `snyk-code`, `license-fs`, `image`, `semgrep`, `analyze` (CodeQL), `pre-commit`, `test-and-coverage`
+- [x] Require status checks to pass before merging
+  - **PUBLIC**: `sonarcloud`, `snyk-open-source`, `snyk-code`, `license-fs`, `image` (if Docker), `semgrep`, `analyze` (CodeQL), `pre-commit`, `test-and-coverage`
+  - **PRIVATE**: `sonarqube`, `trivy-fs`, `license-fs`, `image` (if Docker), `semgrep`, `pre-commit`, `test-and-coverage`
 - [x] Require branches to be up to date before merging
 - [x] Require linear history
 - [x] Do not allow bypassing the above settings
+- [x] Restrict pushes that create matching branches → no one
 - [x] Block force pushes
 - [x] Block deletions
 
 ---
 
-## 9. Container image publishing
+## 5. Container image publishing (only if Dockerfile present)
 
-The workflow publishes your container image to **GitHub Container Registry**
-(`ghcr.io/timo-jakob/ai-doc-organizer`).
+The generated workflows build, scan, and publish your container image to
+**GitHub Container Registry** (`ghcr.io/timo-jakob/ai-doc-organizer`). Publish events:
 
-| Trigger | Tags | Platforms |
+| Trigger | Tags applied | Platforms |
 |---|---|---|
-| Push to `main` | `latest`, `sha-<7>`, `main` | `linux/amd64` + `linux/arm64` |
-| Release `v1.2.3` | `1.2.3`, `1.2`, `1`, `latest` | `linux/amd64` + `linux/arm64` |
-| PR | Built + scanned, not pushed | `linux/amd64` only |
+| Push to `main` (merge) | `latest`, `sha-<7>`, `main` | `linux/amd64` + `linux/arm64` |
+| GitHub Release `v1.2.3` | `1.2.3`, `1.2`, `1`, `latest` (if not prerelease) | `linux/amd64` + `linux/arm64` |
+| PR | **Built + scanned but not pushed** — verifies image is clean without polluting the registry | `linux/amd64` only (fast feedback) |
 
-The scan runs **before** the push. A vulnerable image never reaches the registry.
+The scan (Snyk container for public repos, Trivy for private) runs **before**
+the push. A vulnerable image never reaches the registry.
 
-### SBOM + provenance + signature
+### Multi-arch builds
 
-Every published image carries:
-- **CycloneDX JSON SBOM** (via Syft / BuildKit)
-- **SLSA provenance** attestation
-- **Sigstore cosign signature** (keyless OIDC)
+Published images are multi-arch: both `linux/amd64` and `linux/arm64`. The
+arm64 image covers Apple Silicon Macs running Docker Desktop, AWS Graviton
+EC2 instances, Raspberry Pi, and other ARM hosts. PRs only build amd64 to
+keep feedback fast — security scanners read dependency manifests + distro
+packages, which are architecture-invariant at the source level, so scanning
+amd64 is a reasonable proxy for arm64 too.
 
-**Inspect the SBOM:**
+The arm64 build uses QEMU emulation on a single x86 runner, which is slower
+than native arm64 but free on GitHub-hosted `ubuntu-latest`. If build time
+becomes a problem on the public path, switch to a matrix using
+`runs-on: ubuntu-24.04-arm` for native arm64 (also free for public repos).
+
+### SBOM + provenance attestations
+
+Every published image carries two supply-chain attestations attached as
+**OCI artifacts** alongside the image manifest:
+
+- **CycloneDX JSON SBOM** — full inventory of every package in the image,
+  generated by [Syft](https://github.com/anchore/syft) via BuildKit's
+  native attestation flow. The CycloneDX version emitted tracks whatever
+  Syft's current default is (1.5+); each SBOM is validated by
+  `cyclonedx-cli` to confirm it is well-formed.
+- **SLSA provenance** — records the build steps, source repo, commit SHA,
+  and build inputs. `provenance: mode=max` includes the full build graph.
+
+These are attached **without bloating the image** — they live as separate
+artifacts in the registry that reference the image by digest.
+
+**Inspect the SBOM** from the registry:
 ```sh
+# Pretty-print SBOM via Buildx
 docker buildx imagetools inspect ghcr.io/timo-jakob/ai-doc-organizer:latest \
   --format '{{ json .SBOM }}' | jq .
+
+# Or download via oras
+oras discover ghcr.io/timo-jakob/ai-doc-organizer:latest
 ```
 
-**Verify the image signature:**
+**Verify provenance** with cosign or slsa-verifier:
 ```sh
-brew install cosign
+# Install once: brew install cosign slsa-verifier
+slsa-verifier verify-image ghcr.io/timo-jakob/ai-doc-organizer:latest \
+  --source-uri github.com/timo-jakob/ai-doc-organizer
+```
+
+**Verify the image signature** (every published image is signed by cosign
+using GitHub's OIDC token — no key management required):
+
+```sh
+# Install once: brew install cosign
+
+# Verify by tag — checks the image was signed by this repo's workflow
 cosign verify ghcr.io/timo-jakob/ai-doc-organizer:latest \
+  --certificate-identity-regexp "^https://github.com/timo-jakob/ai-doc-organizer/" \
+  --certificate-oidc-issuer "https://token.actions.githubusercontent.com"
+
+# Or verify by immutable digest (safer for production pulls)
+cosign verify ghcr.io/timo-jakob/ai-doc-organizer@sha256:<digest> \
   --certificate-identity-regexp "^https://github.com/timo-jakob/ai-doc-organizer/" \
   --certificate-oidc-issuer "https://token.actions.githubusercontent.com"
 ```
 
-### Image visibility — one-time manual step
+The signature is attached as an OCI artifact alongside the image, signed by
+a short-lived certificate issued by Sigstore's Fulcio against the workflow's
+OIDC token. The cert lifetime is ~10 minutes, but the signature's transparency
+log entry (in Rekor) is permanent.
+
+**Why this matters**: SBOM + provenance attestations describe *what the image
+contains* and *how it was built*. The cosign signature proves *who built it*.
+Without the signature, anyone with `packages: write` (or a stolen token) could
+push a malicious image with the same tag — the SBOM and provenance would be
+re-attached by the attacker and look legitimate. The cosign signature can
+only come from this workflow running on this repo's `main` branch (or
+release events).
+
+For pulls in production, enforce signature verification with a tool like
+[cosigned](https://docs.sigstore.dev/policy-controller/overview/) (a
+Kubernetes admission controller) or build the verification step into your
+deployment scripts.
+
+**Download the SBOM as a workflow artifact** from any successful run on
+the default branch: GitHub UI → Actions → workflow run → Artifacts →
+`sbom-cyclonedx-<sha>`. Useful for offline analysis or feeding into a
+dependency-tracking system (e.g. [Dependency-Track](https://dependencytrack.org)).
+
+### 5.1 Authentication
+
+The workflow uses the auto-provisioned `GITHUB_TOKEN` — no manual token setup
+needed. The `permissions: packages: write` block in the workflow grants the
+required scope.
+
+### 5.2 Image visibility — one-time manual step
 
 GHCR creates new container packages as **private** by default. After your
 first publish:
 
-- Go to: `https://github.com/users/timo-jakob/packages/container/ai-doc-organizer/settings`
-- Scroll to "Danger Zone" → "Change visibility" → Public.
+- **Public repos that want a public image** — go to:
+  `https://github.com/users/<owner>/packages/container/<repo>/settings`
+  Scroll to "Danger Zone" → "Change visibility" → Public.
+- **Private repos** — no action needed; private is the right default.
+
+This is a one-time flip; subsequent publishes preserve the visibility you set.
+
+### 5.3 Switching to a different registry
+
+If you want to publish to Docker Hub instead of (or in addition to) GHCR, edit
+the `image` job in `.github/workflows/quality-public.yml`:
+
+1. Add a `Login to Docker Hub` step with `docker/login-action@v4`, registry
+   `docker.io`, using `secrets.DOCKERHUB_USERNAME` + `secrets.DOCKERHUB_TOKEN`.
+2. Add a Docker Hub image to `docker/metadata-action`'s `images` input
+   (newline-separated):
+   ```yaml
+   images: |
+     ghcr.io/${{ github.repository }}
+     docker.io/<your-user-or-org>/<repo>
+   ```
+3. Add the secrets in repo Settings → Secrets and variables → Actions.
+
+The same `push` and `build-push-action` steps will handle both registries.
 
 ---
 
-## 10. First run
+## 6. First run
 
-1. Commit the bootstrap output (the `/development:bootstrap` skill offers this).
+1. Commit the bootstrap output: `git add . && git commit -m "Bootstrap quality + security toolchain"`.
 2. Push to a feature branch and open a PR.
-3. Watch CI — all checks should run. The first run takes longer (SonarCloud
+3. Watch CI — all checks should run. The first run takes longer (SonarCloud/Sonar
    needs to index the project; Snyk pulls dep graphs).
 4. If anything fails, fix it locally — `pre-commit run --all-files` reproduces
-   most of the checks.
+   most of the checks, and the agent guidance in `CLAUDE.md` keeps Claude Code
+   honest while you work.

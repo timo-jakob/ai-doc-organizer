@@ -1,0 +1,13 @@
+# gitleaks configuration — extends the default rule set.
+# Default rules at: https://github.com/gitleaks/gitleaks/blob/master/config/gitleaks.toml
+
+[extend]
+useDefault = true
+
+# Allow documented `curl -u "$ENV_VAR:"` patterns. These appear in SETUP.md
+# as examples of how to invoke the SonarQube API with the user's local token
+# in an environment variable — there's no real secret in the file.
+[[allowlists]]
+description = "Allow curl env-var auth in documentation"
+regexTarget = "match"
+regexes = ['''-u "\$[A-Z_]+:"''']
