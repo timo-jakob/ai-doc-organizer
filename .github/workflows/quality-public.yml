@@ -256,7 +256,7 @@ jobs:
       - name: Validate SBOM is well-formed CycloneDX
         if: github.event_name == 'push' || github.event_name == 'release'
         run: |
-          docker run --rm -v "$PWD:/work" cyclonedx/cyclonedx-cli:v0.32.0 \
+          docker run --rm -v "$PWD:/work" cyclonedx/cyclonedx-cli:0.32.0 \
             validate --input-file /work/sbom.cdx.json --input-format json --fail-on-errors
 
       - name: Upload SBOM artifact
