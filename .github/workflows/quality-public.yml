@@ -80,16 +80,25 @@ jobs:
       # on new lines vs origin/main. PR-only because there's no "new code"
       # diff to compute on push to the default branch. Uses the cobertura
       # coverage.xml produced above.
-      #
-      # BASE_REF is funnelled through env: rather than inlined into the
-      # run: script to keep semgrep's run-shell-injection rule happy —
-      # github context values are untrusted input.
-      - name: Coverage floor — 90% on new code
+      - name: Install diff-cover (Python — coverage floor)
+        if: github.event_name == 'pull_request'
+        run: pip install 'diff-cover>=9'
+      # BASE_REF is funnelled through `env:` rather than inlined into
+      # `run:` to keep semgrep's run-shell-injection rule happy —
+      # github-context values are untrusted input (a PR author can target
+      # a maliciously-named base branch). Applies to both steps below.
+      - name: Fetch base ref for diff-cover (Python)
         if: github.event_name == 'pull_request'
         env:
           BASE_REF: ${{ github.base_ref }}
         run: |
-          pip install 'diff-cover>=9'
+          git fetch --no-tags --prune --depth=100 origin \
+            "+refs/heads/${BASE_REF}:refs/remotes/origin/${BASE_REF}"
+      - name: Coverage floor — 90% on new code (Python)
+        if: github.event_name == 'pull_request'
+        env:
+          BASE_REF: ${{ github.base_ref }}
+        run: |
           diff-cover coverage.xml \
             --compare-branch="origin/${BASE_REF}" \
             --fail-under=90 \
@@ -119,7 +128,8 @@ jobs:
         with:
           name: coverage-reports
           path: .
-        continue-on-error: true
+        # No continue-on-error: if test-and-coverage didn't produce coverage,
+        # Sonar should fail loudly rather than silently report green without it.
       - name: SonarCloud scan
         uses: SonarSource/sonarqube-scan-action@v8
         env:
