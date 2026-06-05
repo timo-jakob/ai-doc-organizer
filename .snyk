@@ -96,4 +96,17 @@ ignore:
         reason: Base-image CVE (gnutls28/libgnutls30); awaiting Debian patch.
         expires: "2026-08-29T00:00:00.000Z"
         created: "2026-05-31T00:00:00.000Z"
+  # --- New entries (2026-06-04): surfaced after Snyk DB refresh against the
+  # python:3.14-slim-bookworm base image. Same pattern as above — base-image
+  # CVEs from bookworm distro packages, fixable only by Debian.
+  SNYK-DEBIAN12-POPPLER-17132785:
+    - "*":
+        reason: Base-image CVE (poppler/libpoppler126 via poppler-utils); awaiting Debian patch.
+        expires: "2026-09-02T00:00:00.000Z"
+        created: "2026-06-04T00:00:00.000Z"
+  SNYK-DEBIAN12-NODEBABEL7-17134320:
+    - "*":
+        reason: Base-image CVE (node-babel7-runtime via npm shipped with python base image); awaiting Debian patch.
+        expires: "2026-09-02T00:00:00.000Z"
+        created: "2026-06-04T00:00:00.000Z"
 patch: {}

@@ -1,8 +1,12 @@
 # Contributing to ai-doc-organizer
 
-Thanks for contributing! This project enforces a strict **Zero Tolerance Quality
-Gate** — every PR must hit 90% coverage on new code, 0 code smells, and A
-ratings across Reliability, Security, Maintainability, and Security Review.
+Thanks for contributing! This project enforces a **Zero Tolerance standard** on
+new code: ≥90% line coverage, 0 code smells, and A ratings across Reliability,
+Security, Maintainability, and Security Review. The 90% coverage bar is
+enforced in CI by a `coverage-floor` step (and locally by a matching pre-push
+hook); the smells / ratings / hotspot signals are enforced by the configured
+Sonar Quality Gate. See the [Quality Gate](#quality-gate) section below for
+the full layered model.
 
 To keep the feedback loop fast, the same checks run **locally** before they run
 in CI. Don't skip them.
@@ -43,8 +47,7 @@ pre-commit run --all-files
 # Static analysis
 semgrep --config=auto
 
-# Tests with coverage
-pytest --cov
+# Tests with coverage (language-dependent — see SETUP.md)
 ```
 
 The implementing agent (Claude Code) is configured via `CLAUDE.md` to run these
@@ -63,32 +66,39 @@ generation + commit for you.
 ### 4. Open a PR
 
 Push your branch and open a PR. CI will run:
-- Static analysis (SonarCloud)
-- Security scans (Snyk Code + Snyk Open Source + Snyk Container)
-- License compliance (Trivy)
-- Tests + coverage (pytest)
-- Semgrep + CodeQL
-- Secret scanning (gitleaks)
+- Static analysis (SonarCloud or self-hosted SonarQube)
+- Security scans (Snyk on public; Trivy on private)
+- Language-specific tests + coverage
+- Semgrep + CodeQL (public only)
+- Secret scanning
 
 A PR can only merge to `main` when all required checks pass and a
 review is approved.
 
 ## Quality Gate
 
-Defined in SonarCloud as "Zero Tolerance":
+The Zero Tolerance standard is the same in either case; the **layer** that
+enforces each condition depends on the Sonar tier in use:
 
-| Condition | Threshold |
-|---|---|
-| Coverage on new code | ≥ 90% |
-| Code smells on new code | = 0 |
-| Bugs on new code | = 0 |
-| Vulnerabilities on new code | = 0 |
-| Security hotspots reviewed | 100% |
-| Reliability rating on new code | A |
-| Security rating on new code | A |
-| Maintainability rating on new code | A |
-| Security review rating on new code | A |
-| Duplicated lines on new code | ≤ 3% |
+| Condition | Threshold | Enforced by |
+|---|---|---|
+| Coverage on new code | ≥ 90% | `coverage-floor` CI step (`diff-cover`) + pre-push hook |
+| Code smells on new code | = 0 | Sonar Quality Gate |
+| Bugs on new code | = 0 | Sonar Quality Gate |
+| Vulnerabilities on new code | = 0 | Sonar Quality Gate |
+| Security hotspots reviewed | 100% | Sonar Quality Gate |
+| Reliability rating on new code | A | Sonar Quality Gate |
+| Security rating on new code | A | Sonar Quality Gate |
+| Maintainability rating on new code | A | Sonar Quality Gate |
+| Security review rating on new code | A | Sonar Quality Gate |
+| Duplicated lines on new code | ≤ 3% | Sonar Quality Gate |
+
+The Sonar Quality Gate is the custom "Zero Tolerance" gate on paid SonarCloud
+or self-hosted SonarQube CE. On **SonarCloud free**, custom-gate assignment is
+paywalled (Team/Enterprise feature) — the project falls back to the default
+`Sonar way` gate, which is the same set of conditions at slightly lower
+thresholds (e.g. 80% coverage, not 90). The `coverage-floor` CI step still
+carries the 90% bar regardless, so the standard is preserved.
 
 Applies to **new code only** — historical debt is tracked separately and does
 not block new merges.
