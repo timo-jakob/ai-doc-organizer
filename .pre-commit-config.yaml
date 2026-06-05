@@ -1,6 +1,9 @@
 # Pre-commit hooks — run locally before each commit to enforce shift-left.
 # Install with: pip install pre-commit && pre-commit install
 # Run on all files: pre-commit run --all-files
+#
+# Language-specific blocks below are gated by the bootstrap skill — only the
+# blocks matching python are kept; the rest are stripped.
 
 repos:
   # --- universal hooks -------------------------------------------------------
@@ -29,10 +32,32 @@ repos:
       - id: semgrep
         args: ["--config=auto", "--error", "--quiet"]
 
-  # --- Python ----------------------------------------------------------------
+
   - repo: https://github.com/astral-sh/ruff-pre-commit
     rev: v0.15.14
     hooks:
       - id: ruff
         args: ["--fix", "--exit-non-zero-on-fix"]
       - id: ruff-format
+
+  # Coverage floor — local mirror of the CI `coverage-floor` step. Same
+  # `diff-cover` invocation, same 90%-on-new-code threshold; catches the
+  # bar locally before push instead of after CI rejects the PR.
+  #
+  # Stage is `pre-push`, not `pre-commit` — diff-cover reads coverage.xml
+  # and compares against origin/main, which only makes sense
+  # at push time.
+  #
+  # Contract: assumes a recent `pytest --cov --cov-report=xml` produced
+  # `coverage.xml` in the worktree. If it's missing, the hook fails with
+  # a clear message — run pytest first.
+  - repo: local
+    hooks:
+      - id: coverage-floor
+        name: Coverage floor (90% on new code) — requires recent pytest --cov-report=xml
+        entry: diff-cover coverage.xml --compare-branch=origin/main --fail-under=90
+        language: python
+        additional_dependencies: ["diff-cover>=9"]
+        pass_filenames: false
+        always_run: true
+        stages: [pre-push]
