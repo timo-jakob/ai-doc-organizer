@@ -35,6 +35,19 @@ class MutationContext:
     now: Callable[[], datetime]
 
 
+def _safe_filename(name: str) -> str:
+    # API-boundary path-traversal guard. Strips any directory components from
+    # caller-provided filenames (Path.name is the basename) and rejects the
+    # empty / "." / ".." cases. Without this, a direct caller of rename()
+    # could move the filed PDF outside its archive directory via e.g.
+    # "../foo.pdf"; the HTTP route layer already does the same sanitization,
+    # so this is defense-in-depth for non-HTTP callers.
+    safe = Path(name).name
+    if not safe or safe in (".", ".."):
+        raise ValueError(f"Invalid filename: {name!r}")
+    return safe
+
+
 def _person_slug_or_none(ctx: MutationContext, person_id: int | None) -> str | None:
     if person_id is None:
         return None
@@ -63,6 +76,7 @@ def re_file(
     note: str | None = None,
 ) -> Path:
     """Move the filed document to a new person/category, optionally renaming."""
+    filename = _safe_filename(filename)
     with ctx.lock:
         d = get_decision(ctx.conn, decision_id)
         if d is None:
@@ -116,6 +130,7 @@ def rename(
     ctx: MutationContext, decision_id: int, *, filename: str, note: str | None = None
 ) -> Path:
     """Rename the filed document in place."""
+    filename = _safe_filename(filename)
     with ctx.lock:
         d = get_decision(ctx.conn, decision_id)
         if d is None:
@@ -224,6 +239,7 @@ def promote_category(
     note: str | None = None,
 ) -> CategoryRow:
     """Create a new category from a proposal, then re-file the document into it."""
+    filename = _safe_filename(filename)
     with ctx.lock:
         d = get_decision(ctx.conn, decision_id)
         if d is None:

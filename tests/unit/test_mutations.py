@@ -149,3 +149,53 @@ def test_promote_category_creates_category_and_refiles(ctx):
     assert Path(d.filed_path).parent.name == "garten"
     [audit] = list_actions_for_decision(ctx["ctx"].conn, ctx["decision_id"])
     assert audit.action == ManualAction.PROMOTE_CATEGORY
+
+
+@pytest.mark.parametrize("bad_name", ["", ".", "..", "/", "./", "../"])
+def test_rename_rejects_invalid_filenames(ctx, bad_name):
+    # Defense-in-depth at the mutation API: any input whose basename is
+    # empty, ".", or ".." must raise ValueError before touching the lock.
+    with pytest.raises(ValueError, match="Invalid filename"):
+        rename(ctx["ctx"], ctx["decision_id"], filename=bad_name)
+
+
+@pytest.mark.parametrize(
+    ("input_name", "expected_name"),
+    [
+        ("../escape.pdf", "escape.pdf"),
+        ("/abs/x.pdf", "x.pdf"),
+        ("a/b/c/nested.pdf", "nested.pdf"),
+    ],
+)
+def test_rename_strips_path_components(ctx, input_name, expected_name):
+    # Traversal-style inputs reduce to their basename and the file stays
+    # inside its original parent directory — the os.replace target never
+    # escapes that directory.
+    src = Path(get_decision(ctx["ctx"].conn, ctx["decision_id"]).filed_path)
+    original_parent = src.parent
+    out = rename(ctx["ctx"], ctx["decision_id"], filename=input_name)
+    assert out.parent == original_parent
+    assert out.name == expected_name
+
+
+def test_re_file_rejects_traversal_filename(ctx):
+    with pytest.raises(ValueError, match="Invalid filename"):
+        re_file(
+            ctx["ctx"],
+            ctx["decision_id"],
+            person_id=ctx["timo"].id,
+            category_id=ctx["rechnungen"].id,
+            filename="..",
+        )
+
+
+def test_promote_category_rejects_traversal_filename(ctx):
+    with pytest.raises(ValueError, match="Invalid filename"):
+        promote_category(
+            ctx["ctx"],
+            ctx["decision_id"],
+            new_category_slug="garten",
+            new_category_display_name="Garten",
+            person_id=ctx["timo"].id,
+            filename=".",
+        )
