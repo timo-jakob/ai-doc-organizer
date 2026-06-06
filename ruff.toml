@@ -25,3 +25,4 @@ ignore = [
 
 [lint.per-file-ignores]
 "tests/**/*.py" = ["S", "B018"]   # security checks too noisy in tests
+".github/scripts/**/*.py" = ["S603", "S607"]   # subprocess uses array form (no shell), exec path is git
