@@ -28,7 +28,7 @@ def web(tmp_path):
     with connect(db) as conn:
         init_db(conn)
         timo = create_person(conn, slug="timo", display_name="Timo")
-        _anna = create_person(conn, slug="anna", display_name="Anna")
+        _ = create_person(conn, slug="anna", display_name="Anna")
         cat = create_category(conn, slug="rechnungen", display_name="Rechnungen")
         create_category(conn, slug="steuer", display_name="Steuer")
         create_category(conn, slug="_review", display_name="_review", is_review=True)

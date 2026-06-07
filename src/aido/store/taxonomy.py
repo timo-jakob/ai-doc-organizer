@@ -46,9 +46,6 @@ def _row_to_doctype(row: sqlite3.Row) -> DoctypeRow:
     )
 
 
-_CAT_COLS = "id, slug, display_name, description, is_review, is_active"
-_DT_COLS = "id, slug, display_name, description, is_active"
-
 # Adjacent-string-literal SQL constants — no runtime `+`/f-string so ruff
 # S608 + semgrep formatted-sql-query don't misfire. All variable inputs
 # flow through `?` placeholders.

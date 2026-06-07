@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import contextlib
-import logging
 import os
 import sqlite3
 import threading
@@ -20,8 +19,6 @@ from aido.store.migrations import init_db
 from aido.worker.pipeline import Pipeline, PipelineOutcome
 from aido.worker.queue import InboxQueue
 from aido.worker.watcher import InboxWatcher
-
-_log = logging.getLogger("aido.daemon")
 
 
 class HealthStatus(StrEnum):

@@ -69,18 +69,12 @@ def test_run_with_web_invokes_flask_and_cleans_up_on_return(cfg_paths, monkeypat
     # Don't actually install global signal handlers — record the calls.
     monkeypatch.setattr("aido.main.signal.signal", MagicMock())
 
-    from aido.main import RuntimeContext, run
-
-    real_build = None
-
-    # Patch Flask.app.run via the RuntimeContext: easiest is to wrap
-    # build_runtime so we can override `rt.app.run` after construction.
     import aido.main as main_mod
 
     real_build = main_mod.build_runtime
 
     def wrapped_build(**kwargs):
-        rt: RuntimeContext = real_build(**kwargs)
+        rt: main_mod.RuntimeContext = real_build(**kwargs)
         captured["rt"] = rt
         captured["app_run"] = MagicMock()
         rt.app.run = captured["app_run"]  # type: ignore[attr-defined]
@@ -88,7 +82,7 @@ def test_run_with_web_invokes_flask_and_cleans_up_on_return(cfg_paths, monkeypat
 
     monkeypatch.setattr("aido.main.build_runtime", wrapped_build)
 
-    rt = run(
+    rt = main_mod.run(
         config_path=cfg_paths["cfg"],
         pidfile=cfg_paths["pidfile"],
         run_web=True,
@@ -125,16 +119,13 @@ def test_sigterm_handler_triggers_shutdown_and_sys_exit(cfg_paths, monkeypatch):
 
     monkeypatch.setattr("aido.main.signal.signal", fake_signal_signal)
 
-    from aido.main import RuntimeContext, run
-
-    real_build = None
     import aido.main as main_mod
 
     real_build = main_mod.build_runtime
     captured: dict = {}
 
     def wrapped_build(**kwargs):
-        rt: RuntimeContext = real_build(**kwargs)
+        rt: main_mod.RuntimeContext = real_build(**kwargs)
         rt.app.run = MagicMock()  # type: ignore[attr-defined]
         # Wrap shutdown so we can verify it runs from the signal handler.
         original_shutdown = rt.shutdown
@@ -150,7 +141,7 @@ def test_sigterm_handler_triggers_shutdown_and_sys_exit(cfg_paths, monkeypatch):
 
     monkeypatch.setattr("aido.main.build_runtime", wrapped_build)
 
-    run(
+    main_mod.run(
         config_path=cfg_paths["cfg"],
         pidfile=cfg_paths["pidfile"],
         run_web=True,
@@ -181,9 +172,9 @@ def test_main_parses_argv_and_returns_zero(cfg_paths, monkeypatch):
 
     monkeypatch.setattr("aido.main.run", fake_run)
 
-    from aido.main import main
+    import aido.main as main_mod
 
-    rc = main(
+    rc = main_mod.main(
         [
             "--config",
             str(cfg_paths["cfg"]),
@@ -208,9 +199,9 @@ def test_main_uses_defaults_when_no_argv(monkeypatch):
 
     monkeypatch.setattr("aido.main.run", fake_run)
 
-    from aido.main import main
+    import aido.main as main_mod
 
-    rc = main([])
+    rc = main_mod.main([])
     assert rc == 0
     assert calls["kwargs"]["config_path"] == Path("/app/config.yaml")
     assert calls["kwargs"]["pidfile"] == Path("/var/run/aido.pid")

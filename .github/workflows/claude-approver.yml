@@ -232,7 +232,7 @@ jobs:
       # ============================================================
       - name: Mint Approver App token
         id: app_token
-        uses: actions/create-github-app-token@v1
+        uses: actions/create-github-app-token@d72941d797fd3113feb6b93fd0dec494b13a2547  # v1
         with:
           app-id: ${{ vars.CLAUDE_APPROVER_APP_ID }}
           private-key: ${{ secrets.CLAUDE_APPROVER_PRIVATE_KEY }}
@@ -243,7 +243,7 @@ jobs:
       # is review-only and never pushes).
       # ============================================================
       - name: Checkout PR HEAD
-        uses: actions/checkout@v6
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10  # v6
         with:
           ref: ${{ steps.green.outputs.head_sha }}
           token: ${{ steps.app_token.outputs.token }}
@@ -256,7 +256,7 @@ jobs:
       # the canonical fork.
       # ============================================================
       - name: Checkout Claude plugin family
-        uses: actions/checkout@v6
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10  # v6
         with:
           repository: "timo-jakob/timos-claude-code-plugins"
           # Pinned to the SHA that was current at bootstrap time. Bumping
