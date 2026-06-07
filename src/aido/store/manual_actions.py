@@ -8,11 +8,6 @@ from datetime import datetime
 
 from aido.types import ManualAction
 
-_COLS = (
-    "id, decision_id, action, before_path, after_path, "
-    "before_person_id, after_person_id, before_category_id, after_category_id, "
-    "created_at AS 'created_at [DATETIME]', note"
-)
 # Adjacent-string-literal concatenation — no runtime `+`/f-string for the
 # linters to flag. All variable inputs flow through `?` placeholders.
 _SQL_LIST_ACTIONS_FOR_DECISION = (

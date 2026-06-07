@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import argparse
-import logging
 import signal
 import sqlite3
 import sys
@@ -17,8 +16,6 @@ from aido.config import Config, load_config
 from aido.daemon import Daemon
 from aido.logging_setup import configure_logging
 from aido.webui.app import WebState, create_app
-
-_log = logging.getLogger("aido.main")
 
 
 @dataclass

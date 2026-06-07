@@ -8,14 +8,6 @@ from datetime import date, datetime
 
 from aido.types import DecisionStatus
 
-_COLS = (
-    "id, created_at AS 'created_at [DATETIME]', source_hash, source_path, filed_path, "
-    "person_id, category_id, doctype_id, "
-    "document_date AS 'document_date [DATE]', counterparty, proposed_filename, "
-    "overall_confidence, person_confidence, category_confidence, "
-    "reasoning, classifier_model, new_category_proposal, "
-    "needs_review, status"
-)
 # Each query below uses adjacent-string-literal concatenation (compile-time)
 # rather than runtime `+` so ruff S608 and semgrep's raw-query rules don't
 # misfire. All variable inputs flow through `?` placeholders.

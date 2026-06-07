@@ -6,12 +6,6 @@ import sqlite3
 from dataclasses import dataclass
 from datetime import datetime
 
-_COLS = (
-    "id, source_path, source_hash, attempts, "
-    "next_attempt_at AS 'next_attempt_at [DATETIME]', "
-    "last_error, "
-    "created_at AS 'created_at [DATETIME]'"
-)
 # Adjacent-string-literal concatenation (compile-time) — no runtime `+` or
 # f-string so ruff S608 + semgrep formatted-sql-query don't misfire. All
 # variable inputs flow through `?` placeholders.
