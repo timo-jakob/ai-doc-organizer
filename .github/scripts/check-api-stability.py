@@ -91,88 +91,109 @@ def title_breaking(title: str) -> bool:
 
 def run_griffe_check(old_ref: str, new_ref: str, package_name: str) -> list[dict]:
     """
-    Invoke `griffe check` between `old_ref` and `new_ref`. Returns a list
-    of finding dicts. An empty list means no breaking changes.
+    Use griffe's Python API to find breaking changes between `old_ref` and
+    `new_ref`. Returns a list of finding dicts. An empty list means no
+    breaking changes.
 
-    `griffe check` exit codes (per its documented behaviour):
-      0 = no breaking changes
-      1 = breaking changes found
-      anything else = tool error
+    Uses the Python API directly (rather than spawning the griffe CLI)
+    so it works across griffe versions without depending on CLI flag
+    stability (e.g. griffe 2.x dropped `--format json`).
     """
-    cmd = [
-        "griffe",
-        "check",
-        package_name,
-        "-a",
-        old_ref,
-        "-b",
-        new_ref,
-        "--format",
-        "json",
-    ]
     try:
-        result = subprocess.run(cmd, capture_output=True, text=True)
-    except FileNotFoundError:
+        import griffe
+        from griffe._internal.diff import find_breaking_changes
+    except ImportError:
         return [
             {
                 "kind": "tool_missing",
                 "path": "",
-                "detail": "`griffe` not found on PATH.",
+                "detail": "`griffe` Python package not importable.",
                 "severity": "critical",
             }
         ]
 
-    if result.returncode not in (0, 1):
+    # Resolve search paths: prefer src/ layout; fall back to repo root.
+    repo_root = Path(".")
+    search_paths = [str(repo_root / "src")] if (repo_root / "src").is_dir() else [str(repo_root)]
+
+    try:
+        old_package = griffe.load_git(
+            package_name,
+            ref=old_ref,
+            repo=str(repo_root),
+            search_paths=search_paths,
+            resolve_aliases=True,
+            resolve_external=None,
+        )
+    except Exception as exc:
         return [
             {
                 "kind": "tool_error",
                 "path": "",
-                "detail": (result.stderr or "")[:1000] or "griffe returned an unexpected exit code",
+                "detail": f"griffe could not load old ref '{old_ref}': {exc}",
                 "severity": "critical",
             }
         ]
 
-    out = result.stdout.strip()
-    if not out:
-        return []
+    # When new_ref is HEAD or a symbolic ref pointing to the current worktree,
+    # load from the filesystem so uncommitted changes are included.
+    _head_aliases = {"HEAD", "head"}
+    if new_ref in _head_aliases or new_ref.upper() == "HEAD":
+        try:
+            new_package = griffe.load(
+                package_name,
+                search_paths=search_paths,
+                resolve_aliases=True,
+                resolve_external=None,
+            )
+        except Exception as exc:
+            return [
+                {
+                    "kind": "tool_error",
+                    "path": "",
+                    "detail": f"griffe could not load working tree: {exc}",
+                    "severity": "critical",
+                }
+            ]
+    else:
+        try:
+            new_package = griffe.load_git(
+                package_name,
+                ref=new_ref,
+                repo=str(repo_root),
+                search_paths=search_paths,
+                resolve_aliases=True,
+                resolve_external=None,
+            )
+        except Exception as exc:
+            return [
+                {
+                    "kind": "tool_error",
+                    "path": "",
+                    "detail": f"griffe could not load new ref '{new_ref}': {exc}",
+                    "severity": "critical",
+                }
+            ]
 
     try:
-        raw = json.loads(out)
-    except json.JSONDecodeError as e:
+        breakages = list(find_breaking_changes(old_package, new_package))
+    except Exception as exc:
         return [
             {
-                "kind": "parse_error",
+                "kind": "tool_error",
                 "path": "",
-                "detail": f"could not parse griffe JSON output: {e}",
-                "severity": "critical",
-            }
-        ]
-
-    # griffe's JSON shape may differ across versions; be defensive.
-    if isinstance(raw, dict):
-        raw = raw.get("results") or raw.get("findings") or []
-    if not isinstance(raw, list):
-        return [
-            {
-                "kind": "parse_error",
-                "path": "",
-                "detail": f"unexpected griffe output shape: {type(raw).__name__}",
+                "detail": f"griffe find_breaking_changes failed: {exc}",
                 "severity": "critical",
             }
         ]
 
     findings: list[dict] = []
-    for item in raw:
-        if not isinstance(item, dict):
-            continue
-        findings.append(
-            {
-                "kind": str(item.get("kind") or item.get("type") or "unknown"),
-                "path": str(item.get("obj_path") or item.get("path") or "?"),
-                "detail": str(item.get("message") or item.get("description") or item),
-                "severity": "high",
-            }
-        )
+    for b in breakages:
+        as_dict = b.as_dict() if hasattr(b, "as_dict") else {}
+        kind = str(as_dict.get("kind") or getattr(b, "kind", "unknown"))
+        path = str(as_dict.get("object_path") or getattr(getattr(b, "obj", None), "path", "?"))
+        detail = str(getattr(b, "details", "") or b)
+        findings.append({"kind": kind, "path": path, "detail": detail, "severity": "high"})
     return findings
 
 
