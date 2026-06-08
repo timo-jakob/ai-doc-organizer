@@ -4,7 +4,7 @@ version = "0.1.0"
 description = "Household document auto-filer for Claude"
 requires-python = ">=3.14"
 dependencies = [
-    "claude-agent-sdk>=0.2.87",
+    "claude-agent-sdk>=0.2.93",
     "anthropic>=0.104.0",
     "pypdf>=6.12.2",
     "watchdog>=6.0.0",
