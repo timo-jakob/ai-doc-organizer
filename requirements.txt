@@ -7,7 +7,7 @@
 
 claude-agent-sdk>=0.2.87
 anthropic>=0.104.0
-pypdf>=6.12.2
+pypdf>=6.13.0
 watchdog>=6.0.0
 flask>=3.0.0
 jinja2>=3.1.6
