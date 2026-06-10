@@ -132,10 +132,17 @@ jobs:
           # use the REST/webhook '<slug>[bot]' form.
           # See timo-jakob/timos-claude-code-plugins#221.
           author=$(gh api "repos/$REPO/pulls/$PR_NUMBER" --jq .user.login)
-          if [ "$author" = "claude-approver[bot]" ]; then
-            echo "::notice::PR author is the Approver itself — refusing self-approval."
-            exit 78
-          fi
+          # Prefix match, not equality: App slugs are globally unique, so
+          # the registered Approver's real login is owner-suffixed
+          # ('claude-approver-timo-jakob[bot]'), never the generic
+          # 'claude-approver[bot]'.
+          # See timo-jakob/timos-claude-code-plugins#229.
+          case "$author" in
+            claude-approver*"[bot]")
+              echo "::notice::PR author is the Approver itself — refusing self-approval."
+              exit 78
+              ;;
+          esac
           echo "login=$author" >> "$GITHUB_OUTPUT"
 
       # ============================================================
@@ -198,8 +205,14 @@ jobs:
           # calls below already use $REPO in the path.
           head_sha=$(gh pr view "$PR_NUMBER" -R "$REPO" --json headRefOid --jq .headRefOid)
 
+          # Exclude this workflow's own `approve` job from the green
+          # computation (timo-jakob/timos-claude-code-plugins#228).
+          # Without the filter the gate deadlocks on its own footprint:
+          # the current run is always in_progress on this SHA, and any
+          # earlier run on the SHA concluded failure (exit 78 records
+          # as failure), so the gate could never pass.
           runs=$(gh api "repos/$REPO/commits/$head_sha/check-runs" --paginate \
-                 --jq '.check_runs[] | {name: .name, status: .status, conclusion: .conclusion}' \
+                 --jq '.check_runs[] | select(.name != "approve") | {name: .name, status: .status, conclusion: .conclusion}' \
                  | jq -s .)
           status=$(gh api "repos/$REPO/commits/$head_sha/status" \
                    --jq '{state: .state}')
