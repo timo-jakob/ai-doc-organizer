@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import argparse
+import os
 import signal
 import sqlite3
 import sys
@@ -12,7 +13,7 @@ from dataclasses import dataclass
 from pathlib import Path
 
 from aido.classifier.factory import build_classifier
-from aido.config import Config, load_config
+from aido.config import ClassifierBackend, Config, load_config
 from aido.daemon import Daemon
 from aido.logging_setup import configure_logging
 from aido.webui.app import WebState, create_app
@@ -31,8 +32,62 @@ class RuntimeContext:
         self.daemon.stop()
 
 
-def build_runtime(*, config_path: Path, pidfile: Path) -> RuntimeContext:
+EX_CONFIG = 78  # BSD sysexits.h: configuration error
+
+
+def _preflight_fail(message: str) -> None:
+    print(f"aido: config error: {message}", file=sys.stderr)
+    raise SystemExit(EX_CONFIG)
+
+
+def _preflight(config_path: Path) -> Config:
+    """Validate the environment before starting the daemon.
+
+    Exits with EX_CONFIG (78) and a one-line plain-text message on stderr for
+    each known misconfiguration, instead of letting the daemon crash later
+    with a cryptic traceback.
+    """
+    if config_path.is_dir():
+        _preflight_fail(
+            f"{config_path} is a directory, not a file — Docker creates an empty "
+            "directory when the bind-mount source is missing; create the config "
+            "file on the host and restart"
+        )
+
     cfg = load_config(config_path)
+
+    if (
+        cfg.classifier.backend == ClassifierBackend.ANTHROPIC_API
+        and not os.environ.get("ANTHROPIC_API_KEY", "").strip()
+    ):
+        _preflight_fail(
+            "classifier.backend is 'anthropic_api' but ANTHROPIC_API_KEY is "
+            "unset or blank — set it in the container environment"
+        )
+
+    if not os.access(cfg.archive_root, os.W_OK):
+        _preflight_fail(
+            f"archive_root {cfg.archive_root} is not writable — check that the "
+            "directory exists and the bind mount allows writes"
+        )
+
+    if not cfg.scan_inbox.is_dir() or not os.access(cfg.scan_inbox, os.R_OK):
+        _preflight_fail(
+            f"scan_inbox {cfg.scan_inbox} does not exist or is not readable — "
+            "check the scanner share bind mount"
+        )
+
+    if not os.access(cfg.db_path.parent, os.W_OK):
+        _preflight_fail(
+            f"db_path parent directory {cfg.db_path.parent} is not writable — "
+            "the daemon cannot create or open its SQLite database there"
+        )
+
+    return cfg
+
+
+def build_runtime(*, config_path: Path, pidfile: Path) -> RuntimeContext:
+    cfg = _preflight(config_path)
     configure_logging(cfg.log_path)
 
     daemon = Daemon(

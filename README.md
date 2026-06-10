@@ -39,6 +39,20 @@ via Docker Compose.
 
 See `tests/manual/runbook.md` for the full smoke checklist.
 
+## Troubleshooting
+
+On startup the daemon runs pre-flight checks and exits with code 78
+(`EX_CONFIG`) and a one-line `aido: config error: ...` message on stderr if it
+detects a known misconfiguration. Check `docker compose logs aido` for one of:
+
+| Message | Cause / fix |
+|---------|-------------|
+| `... is a directory, not a file — Docker creates an empty directory when the bind-mount source is missing; create the config file on the host and restart` | `config.yaml` was missing on the host when the container started, so Docker created an empty directory in its place. Remove the directory, run `cp config.example.yaml config.yaml`, and restart. |
+| `classifier.backend is 'anthropic_api' but ANTHROPIC_API_KEY is unset or blank — set it in the container environment` | Add `ANTHROPIC_API_KEY=sk-ant-...` to the project `.env` file (or your shell environment) and restart. |
+| `archive_root ... is not writable — check that the directory exists and the bind mount allows writes` | The archive directory is missing on the host or mounted read-only. Create it and check the volume entry in `docker-compose.yml`. |
+| `scan_inbox ... does not exist or is not readable — check the scanner share bind mount` | The scanner inbox folder is missing or unreadable. Create it (e.g. `~/Scans/incoming/`) and check the volume entry in `docker-compose.yml`. |
+| `db_path parent directory ... is not writable — the daemon cannot create or open its SQLite database there` | The data directory is missing on the host or mounted read-only. Create it and check the volume entry in `docker-compose.yml`. |
+
 ## Development
 
 ```bash
