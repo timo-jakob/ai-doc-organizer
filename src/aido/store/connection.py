@@ -47,8 +47,10 @@ def connect(path: Path | str) -> Iterator[sqlite3.Connection]:
     rolls back on exception.
     """
     _register_adapters_once()
-    Path(path).parent.mkdir(parents=True, exist_ok=True)
-    conn = sqlite3.connect(
+    Path(path).parent.mkdir(
+        parents=True, exist_ok=True
+    )  # nosonar pythonsecurity:S8707 — path is supplied by the human operator via config/CLI, not derived from LLM output
+    conn = sqlite3.connect(  # nosonar pythonsecurity:S8706 — DB path comes from operator config/CLI, not from LLM output; no injection risk
         str(path),
         detect_types=sqlite3.PARSE_DECLTYPES | sqlite3.PARSE_COLNAMES,
         isolation_level=None,  # autocommit; we manage transactions ourselves
