@@ -1,3 +1,5 @@
+# claude-bootstrap: rendered from common/.github/workflows/claude-approver.yml.tmpl @ v1.53.0 sha256:30852188bfa71c1c0947e35a55dbb0097008c545c20d57641083e8deb38e4129
+# (do not edit this line; the maintenance pipeline uses it for drift detection — see #213)
 # Claude Approver — the final synthesis layer for PR approval.
 #
 # Runs LAST: the all-green gate waits in-job for every other check on the
@@ -408,7 +410,7 @@ jobs:
           # this should be a deliberate, reviewable change — a moving `main`
           # could break the Approver here with no commit in this repo to
           # bisect from.
-          ref: "afac37609a911464a4954cd177f73e9c298b2ca9"
+          ref: "f34c8b5420fc3b4658bc36b5cbcc39ff1c7c30c0"
           path: .claude-plugins
           token: ${{ secrets.GITHUB_TOKEN }}
 

@@ -1,3 +1,5 @@
+# claude-bootstrap: rendered from public/.github/workflows/quality-public-noop.yml.tmpl @ v1.53.0 sha256:306ef7ad05d535f13d66b4d3d71f240329dbccd58543c954bbb22664c5728d42
+# (do not edit this line; the maintenance pipeline uses it for drift detection — see #213)
 # Doc-only PR companion for quality-public.yml.
 #
 # Why this file exists: required status checks resolve by NAME, and

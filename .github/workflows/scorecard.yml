@@ -1,3 +1,5 @@
+# claude-bootstrap: rendered from public/.github/workflows/scorecard.yml.tmpl @ v1.53.0 sha256:b05e7307256ddea342aa313fb3a436a8b527dba8148e9c6721796c54fd7d00c2
+# (do not edit this line; the maintenance pipeline uses it for drift detection — see #213)
 # OpenSSF Scorecard — supply-chain security health check.
 # Runs ~20 automated checks (branch protection, signed releases, dangerous
 # workflow patterns, pinned dependencies, code-review coverage, etc.) and

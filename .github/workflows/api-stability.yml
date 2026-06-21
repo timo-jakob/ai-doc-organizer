@@ -1,3 +1,5 @@
+# claude-bootstrap: rendered from common/.github/workflows/api-stability.yml.tmpl @ v1.53.0 sha256:1af03c67c20e4dff30043cecb4b8e9f6b39e2ed37c8da78343625cdc1bfd0084
+# (do not edit this line; the maintenance pipeline uses it for drift detection — see #213)
 # API Stability — Python public-API breaking-change detector.
 #
 # Runs `griffe check` between the PR's merge-base and HEAD, then gates with

@@ -1,3 +1,5 @@
+# claude-bootstrap: rendered from public/.github/workflows/codeql.yml.tmpl @ v1.53.0 sha256:9402d97eced6de4b0d3d6df0481e6023b012b2ab127dbce4a84f83d445858257
+# (do not edit this line; the maintenance pipeline uses it for drift detection — see #213)
 # CodeQL — GitHub-native SAST, free for public repos. Acts as a second-opinion
 # SAST alongside Sonar + Snyk Code.
 
