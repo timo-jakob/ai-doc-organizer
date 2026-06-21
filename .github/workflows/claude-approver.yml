@@ -42,7 +42,7 @@ on:
   # settle, so this run usually IS the one that evaluates — later
   # check_suite triggers just supersede it via the concurrency group.
   pull_request:
-    types: [opened, synchronize, ready_for_review]
+    types: [opened, synchronize, ready_for_review, reopened]
 
   # Manual re-trigger via a PR comment: "/approve" or "/approve --dry-run".
   issue_comment:
@@ -88,6 +88,16 @@ jobs:
     runs-on: ubuntu-latest
     # Covers the wait loop (up to ~30 min) plus the gate API calls.
     timeout-minutes: 40
+    # Entry-point gate for `/approve` PR comments. Anyone with read access
+    # can post a PR comment; without this `if:`, a random commenter could
+    # fire the workflow on any PR and burn API tokens before the in-job
+    # gates skip out. For check_suite and pull_request_review triggers,
+    # GitHub itself already requires actor permissions, so this gate is
+    # scoped to issue_comment. See #190.
+    if: >
+      github.event_name != 'issue_comment' ||
+      contains(fromJSON('["OWNER", "MEMBER", "COLLABORATOR"]'),
+               github.event.comment.author_association)
     outputs:
       number: ${{ steps.pr.outputs.number }}
       dry_run: ${{ steps.pr.outputs.dry_run }}
@@ -109,7 +119,10 @@ jobs:
           COMMENT_BODY: ${{ github.event.comment.body }}
           ISSUE_IS_PR: ${{ github.event.issue.pull_request != null }}
           ISSUE_NUMBER: ${{ github.event.issue.number }}
-          PR_REVIEW_NUMBER: ${{ github.event.pull_request.number }}
+          # github.event.pull_request.number is populated for both
+          # `pull_request` and `pull_request_review` events; same env var
+          # serves both case arms below.
+          PULL_REQUEST_NUMBER: ${{ github.event.pull_request.number }}
         run: |
           set -e
           dry_run=""
@@ -135,11 +148,13 @@ jobs:
                 dry_run="true"
               fi
               ;;
-            pull_request_review)
-              number="$PR_REVIEW_NUMBER"
-              ;;
-            pull_request)
-              number="$PR_REVIEW_NUMBER"
+            pull_request|pull_request_review)
+              # Both events expose github.event.pull_request.number. The
+              # backstop `pull_request` trigger (#198) lands here when no
+              # check_suite ever fires for the head SHA (cache-only runs,
+              # paths-ignored on doc-only PRs). Gate 5 below waits for the
+              # other checks and skips out if the PR ends up not green.
+              number="$PULL_REQUEST_NUMBER"
               ;;
             *)
               echo "::notice::Unrecognised event $EVENT_NAME."
@@ -307,10 +322,28 @@ jobs:
             exit 0
           fi
 
-          # Legacy combined status must be green when statuses exist.
-          if [ "$status_total" -gt 0 ] && [ "$status_state" != "success" ]; then
-            echo "::notice::Combined commit status is '$status_state', not 'success'."
-            exit 0
+          # Legacy commit statuses must be green when they exist — but
+          # ADVISORY channels are excluded (#387). Snyk's `code/snyk` (SAST)
+          # and `security/snyk` (Open Source) post via the legacy commit-status
+          # API yet are never required branch-protection contexts (see
+          # branch-protection.sh). On the free tier they can go ERROR for
+          # quota reasons ("Code test limit reached") that say nothing about
+          # this PR — and that must not silently skip the Approver. So evaluate
+          # the remaining (non-advisory) statuses individually instead of
+          # trusting the aggregate `state`, which any advisory red would taint.
+          # Required legacy statuses (e.g. `sonarcloud`) are NOT excluded and
+          # still gate as before.
+          if [ "$status_total" -gt 0 ]; then
+            status_full=$(gh api "repos/$REPO/commits/$head_sha/status")
+            advisory='select(.context != "code/snyk" and (.context | startswith("security/snyk") | not))'
+            bad_status=$(printf '%s' "$status_full" \
+                         | jq "[.statuses[] | $advisory | select(.state != \"success\")] | length")
+            if [ "$bad_status" -gt 0 ]; then
+              echo "::notice::A non-advisory commit status is not 'success' on $head_sha — skipping:"
+              printf '%s' "$status_full" \
+                | jq ".statuses[] | $advisory | select(.state != \"success\") | {context, state}"
+              exit 0
+            fi
           fi
 
           # Final race check: head SHA must still be the SHA we evaluated.
