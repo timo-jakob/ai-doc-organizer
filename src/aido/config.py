@@ -47,9 +47,8 @@ def _require(d: dict, key: str) -> object:
 
 def load_config(path: Path) -> Config:
     yaml = YAML(typ="safe")
-    raw = yaml.load(
-        path.read_text(encoding="utf-8")
-    )  # nosonar pythonsecurity:S8707 — path is supplied by the human operator (daemon config), not derived from LLM output
+    # path is the daemon config file supplied by the human operator, not LLM output.
+    raw = yaml.load(path.read_text(encoding="utf-8"))  # NOSONAR pythonsecurity:S8707
     if not isinstance(raw, dict):
         raise ValueError(f"{path} is not a YAML mapping")
 
