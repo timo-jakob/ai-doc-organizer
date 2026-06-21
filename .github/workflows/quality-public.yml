@@ -1,3 +1,5 @@
+# claude-bootstrap: rendered from public/.github/workflows/quality-public.yml.tmpl @ v1.53.0 sha256:769ad856eaf36739ec21f7ed560b2a5ab03bf9bec4ed852fa74f9d2d447ae69c
+# (do not edit this line; the maintenance pipeline uses it for drift detection — see #213)
 # Quality + security pipeline for PUBLIC repositories.
 # Runs on github-hosted runners. Uses SonarCloud for static analysis +
 # coverage and Snyk for security (code + open source + container).

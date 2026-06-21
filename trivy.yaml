@@ -1,3 +1,5 @@
+# claude-bootstrap: rendered from common/trivy.yaml.tmpl @ v1.53.0 sha256:23eb0fbfbb5a620686a537a4c6a9f14dd5b91a985544bf0afdb6dad95a32f2cb
+# (do not edit this line; the maintenance pipeline uses it for drift detection — see #213)
 # Trivy config — used by both vulnerability and license scans on the
 # filesystem (deps in lockfiles) and on the built container image.
 
