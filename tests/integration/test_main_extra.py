@@ -31,7 +31,7 @@ classifier:
 
 web:
   bind: 127.0.0.1
-  port: 0
+  port: 8765
 """.strip(),
         encoding="utf-8",
     )
@@ -92,7 +92,7 @@ def test_run_with_web_invokes_flask_and_cleans_up_on_return(cfg_paths, monkeypat
     assert captured["app_run"].called
     call_kwargs = captured["app_run"].call_args.kwargs
     assert call_kwargs["host"] == "127.0.0.1"
-    assert call_kwargs["port"] == 0
+    assert call_kwargs["port"] == 8765
     assert call_kwargs["threaded"] is True
     assert call_kwargs["use_reloader"] is False
 
