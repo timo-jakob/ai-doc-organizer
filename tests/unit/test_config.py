@@ -91,3 +91,44 @@ web:
     )
     with pytest.raises(ValueError, match="threshold"):
         load_config(cfg_path)
+
+
+def _config_with_port(tmp_path: Path, port: object) -> Path:
+    return _write(
+        tmp_path / "config.yaml",
+        f"""
+archive_root: /a
+scan_inbox: /s
+db_path: /d.sqlite
+log_path: /l.log
+classifier:
+  backend: agent_sdk
+  model: x
+  review_confidence_threshold: 0.5
+web:
+  bind: 0.0.0.0
+  port: {port}
+""".strip(),
+    )
+
+
+@pytest.mark.parametrize("port", [0, 65536, -1])
+def test_port_out_of_range_raises(tmp_path: Path, port: int):
+    cfg_path = _config_with_port(tmp_path, port)
+    with pytest.raises(ValueError, match=rf"web\.port .*\(got {port}\)"):
+        load_config(cfg_path)
+
+
+@pytest.mark.parametrize("port", [1, 65535])
+def test_port_boundaries_valid(tmp_path: Path, port: int):
+    cfg = load_config(_config_with_port(tmp_path, port))
+    assert cfg.web.port == port
+
+
+@pytest.mark.parametrize("port", ["abc", "null", "[8080]", "true"])
+def test_port_non_integer_raises(tmp_path: Path, port: str):
+    # null (None), a list, a non-numeric string, and a YAML bool must all fail
+    # with the ValueError contract, not a TypeError or a silent bool->1 coercion.
+    cfg_path = _config_with_port(tmp_path, port)
+    with pytest.raises(ValueError, match=r"web\.port must be an integer"):
+        load_config(cfg_path)

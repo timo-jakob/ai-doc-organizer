@@ -76,6 +76,18 @@ def load_config(path: Path) -> Config:
     web = _require(raw, "web")
     if not isinstance(web, dict):
         raise ValueError("web must be a mapping")
+    raw_port = _require(web, "port")
+    # Coerce to int, but keep the ValueError contract the rest of this loader
+    # uses: a null / list / mapping port would make int() raise TypeError, and
+    # a YAML bool (int subclass) would sneak `true` -> 1 past the range check.
+    if isinstance(raw_port, bool):
+        raise ValueError(f"web.port must be an integer (got {raw_port!r})")
+    try:
+        port = int(raw_port)
+    except (TypeError, ValueError) as e:
+        raise ValueError(f"web.port must be an integer (got {raw_port!r})") from e
+    if not (1 <= port <= 65535):
+        raise ValueError(f"web.port must be in [1, 65535] (got {port})")
 
     return Config(
         archive_root=archive_root,
@@ -89,6 +101,6 @@ def load_config(path: Path) -> Config:
         ),
         web=WebConfig(
             bind=str(_require(web, "bind")),
-            port=int(_require(web, "port")),
+            port=port,
         ),
     )
