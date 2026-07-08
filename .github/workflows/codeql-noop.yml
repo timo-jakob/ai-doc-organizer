@@ -1,3 +1,5 @@
+# claude-bootstrap: rendered from public/.github/workflows/codeql-noop.yml.tmpl @ v1.49.3 sha256:3074535e1feadb97919a0e83980c85714c9dbd5899e14e2911937b2b5b6910a4
+# (do not edit this line; the maintenance pipeline uses it for drift detection — see #213)
 # Doc-only PR companion for codeql.yml — see quality-public-noop.yml's
 # header for the rationale and mixed-PR caveat. Mirrors the matrix shape
 # of the main analyze job so each `analyze (<lang>)` required-status
