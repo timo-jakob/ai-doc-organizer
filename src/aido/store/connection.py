@@ -8,6 +8,8 @@ from collections.abc import Iterator
 from datetime import date, datetime
 from pathlib import Path
 
+from aido._fspath import validated_fs_path
+
 
 def _adapt_datetime(d: datetime) -> str:
     return d.isoformat(timespec="microseconds")
@@ -47,9 +49,12 @@ def connect(path: Path | str) -> Iterator[sqlite3.Connection]:
     rolls back on exception.
     """
     _register_adapters_once()
-    Path(path).parent.mkdir(parents=True, exist_ok=True)
+    # Validate/canonicalize the operator-supplied DB path before it reaches
+    # the filesystem + sqlite3 sinks (pythonsecurity:S8707 / S8706).
+    db_path = validated_fs_path(path)
+    db_path.parent.mkdir(parents=True, exist_ok=True)
     conn = sqlite3.connect(
-        str(path),
+        str(db_path),
         detect_types=sqlite3.PARSE_DECLTYPES | sqlite3.PARSE_COLNAMES,
         isolation_level=None,  # autocommit; we manage transactions ourselves
         check_same_thread=False,  # daemon worker + Flask handlers share one connection
