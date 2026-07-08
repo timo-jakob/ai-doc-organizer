@@ -109,4 +109,37 @@ ignore:
         reason: Base-image CVE (node-babel7-runtime via npm shipped with python base image); awaiting Debian patch.
         expires: "2026-09-02T00:00:00.000Z"
         created: "2026-06-04T00:00:00.000Z"
+  # --- New entries (2026-07-08): high-severity bookworm distro CVEs from the
+  # snyk container scan. All transitive under our tesseract/poppler/coreutils
+  # apt layer, fixable only by Debian (fixed_in empty upstream). 90-day expiry.
+  SNYK-DEBIAN12-ACL-17677870:
+    - "*":
+        reason: Base-image CVE (acl/libacl1 in bookworm, via coreutils); no fixed Debian package as of 2026-07-08. CVE-2026-54369.
+        expires: "2026-10-06T00:00:00.000Z"
+        created: "2026-07-08T00:00:00.000Z"
+  SNYK-DEBIAN12-ATTR-17678193:
+    - "*":
+        reason: Base-image CVE (attr/libattr1 in bookworm); no fixed Debian package as of 2026-07-08. CVE-2026-54371.
+        expires: "2026-10-06T00:00:00.000Z"
+        created: "2026-07-08T00:00:00.000Z"
+  SNYK-DEBIAN12-GLIB20-17740194:
+    - "*":
+        reason: Base-image CVE (glib2.0/libglib2.0-0 in bookworm, via tesseract-ocr); no fixed Debian package as of 2026-07-08. CVE-2026-58014.
+        expires: "2026-10-06T00:00:00.000Z"
+        created: "2026-07-08T00:00:00.000Z"
+  SNYK-DEBIAN12-GLIB20-17740205:
+    - "*":
+        reason: Base-image CVE (glib2.0/libglib2.0-0 in bookworm, via tesseract-ocr); no fixed Debian package as of 2026-07-08. CVE-2026-58016.
+        expires: "2026-10-06T00:00:00.000Z"
+        created: "2026-07-08T00:00:00.000Z"
+  SNYK-DEBIAN12-LIBARCHIVE-17740344:
+    - "*":
+        reason: Base-image CVE (libarchive/libarchive13 in bookworm, via tesseract-ocr); no fixed Debian package as of 2026-07-08. CVE-2026-14164.
+        expires: "2026-10-06T00:00:00.000Z"
+        created: "2026-07-08T00:00:00.000Z"
+  SNYK-DEBIAN12-TIFF-17690413:
+    - "*":
+        reason: Base-image CVE (tiff/libtiff6 in bookworm, via poppler-utils); no fixed Debian package as of 2026-07-08. CVE-2026-12912.
+        expires: "2026-10-06T00:00:00.000Z"
+        created: "2026-07-08T00:00:00.000Z"
 patch: {}

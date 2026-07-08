@@ -1,4 +1,4 @@
-# claude-bootstrap: rendered from common/.github/workflows/template-drift-watch.yml.tmpl @ v1.53.0 sha256:23d15375ea60326ce18905c1114793f79d2dcddd22818160d16375205a2f8fd0
+# claude-bootstrap: rendered from common/.github/workflows/template-drift-watch.yml.tmpl @ v1.70.2 sha256:4132fd65cb3e08c748307799e3ece7d0ca23d423b7b92093a7ad4e905c572c73
 # (do not edit this line; the maintenance pipeline uses it for drift detection — see #213)
 # Scheduled template-drift watcher (#402).
 #

@@ -1,4 +1,4 @@
-# claude-bootstrap: rendered from public/.github/workflows/scorecard.yml.tmpl @ v1.53.0 sha256:b05e7307256ddea342aa313fb3a436a8b527dba8148e9c6721796c54fd7d00c2
+# claude-bootstrap: rendered from public/.github/workflows/scorecard.yml.tmpl @ v1.70.2 sha256:48d565045b18b2042663b676be0d7c9f8cd39aa7fcedf729acb9e386b6d271f2
 # (do not edit this line; the maintenance pipeline uses it for drift detection — see #213)
 # OpenSSF Scorecard — supply-chain security health check.
 # Runs ~20 automated checks (branch protection, signed releases, dangerous
@@ -31,26 +31,27 @@ jobs:
       contents: read           # read repo content
       actions: read            # read workflow definitions
     steps:
-      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10  # v6
+      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
         with:
           persist-credentials: false
 
       - name: Run Scorecard
-        uses: ossf/scorecard-action@4eaacf0543bb3f2c246792bd56e8cdeffafb205a  # v2.4.3
+        uses: ossf/scorecard-action@4eaacf0543bb3f2c246792bd56e8cdeffafb205a # v2.4.3
         with:
           results_file: results.sarif
           results_format: sarif
+          # Publish to https://scorecard.dev — makes the badge URL work.
           publish_results: true
 
       - name: Upload SARIF artifact (for download from this workflow run)
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a  # v7
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
         with:
           name: scorecard-sarif
           path: results.sarif
           retention-days: 30
 
       - name: Upload SARIF to GitHub code scanning
-        uses: github/codeql-action/upload-sarif@8aad20d150bbac5944a9f9d289da16a4b0d87c1e  # v4
+        uses: github/codeql-action/upload-sarif@54f647b7e1bb85c95cddabcd46b0c578ec92bc1a # v4
         with:
           sarif_file: results.sarif
           category: scorecard
