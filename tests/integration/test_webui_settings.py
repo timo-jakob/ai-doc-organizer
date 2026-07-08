@@ -82,6 +82,23 @@ def test_add_alias_to_existing(web):
     assert find_person_by_alias(conn, "jakob").id == timo.id
 
 
+def test_add_alias_owned_by_other_person_returns_400(web):
+    client, conn = web
+    timo = get_person_by_slug(conn, "timo")
+    rv = client.post(
+        "/settings/persons",
+        json={"slug": "anna", "display_name": "Anna Jakob", "aliases": ["Anna Jakob"]},
+    )
+    assert rv.status_code == 200
+
+    rv = client.post(f"/settings/persons/{timo.id}/aliases", json={"alias": "Anna Jakob"})
+    assert rv.status_code == 400
+    assert "UNIQUE constraint" in rv.get_data(as_text=True)
+    # The alias must still resolve to its original owner, not timo.
+    anna = get_person_by_slug(conn, "anna")
+    assert find_person_by_alias(conn, "anna jakob").id == anna.id
+
+
 def test_add_category(web):
     client, conn = web
     rv = client.post(

@@ -1,4 +1,4 @@
-# claude-bootstrap: rendered from common/.github/workflows/api-stability.yml.tmpl @ v1.53.0 sha256:1af03c67c20e4dff30043cecb4b8e9f6b39e2ed37c8da78343625cdc1bfd0084
+# claude-bootstrap: rendered from common/.github/workflows/api-stability.yml.tmpl @ v1.70.2 sha256:6d3b7481f4d3882dadde86295f1ef2aef39121be60ecfd7402bfebd7904b8174
 # (do not edit this line; the maintenance pipeline uses it for drift detection — see #213)
 # API Stability — Python public-API breaking-change detector.
 #
@@ -45,13 +45,13 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
-      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10  # v6
+      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
         with:
           # `griffe check -a/-b` needs both refs available; without
           # full history, the merge-base ref isn't fetched.
           fetch-depth: 0
 
-      - uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405  # v6
+      - uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6
         with:
           python-version: "3.14"
 
@@ -85,7 +85,7 @@ jobs:
         # `if: always()` so the Approver can still read the report even
         # when the gate failed — that's the whole point of having two layers.
         if: always()
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a  # v7.0.1
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
         with:
           name: api-stability-${{ github.event.pull_request.number || github.sha }}
           path: griffe-findings.json
