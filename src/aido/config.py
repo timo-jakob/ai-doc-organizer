@@ -8,6 +8,8 @@ from pathlib import Path
 
 from ruamel.yaml import YAML
 
+from aido._fspath import validated_fs_path
+
 
 class ClassifierBackend(StrEnum):
     AGENT_SDK = "agent_sdk"
@@ -47,9 +49,9 @@ def _require(d: dict, key: str) -> object:
 
 def load_config(path: Path) -> Config:
     yaml = YAML(typ="safe")
-    raw = yaml.load(
-        path.read_text(encoding="utf-8")
-    )  # nosonar pythonsecurity:S8707 — path is supplied by the human operator (daemon config), not derived from LLM output
+    # Validate/canonicalize the operator-supplied config path before reading it
+    # from the filesystem (pythonsecurity:S8707).
+    raw = yaml.load(validated_fs_path(path).read_text(encoding="utf-8"))
     if not isinstance(raw, dict):
         raise ValueError(f"{path} is not a YAML mapping")
 
