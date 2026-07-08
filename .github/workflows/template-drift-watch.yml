@@ -1,4 +1,4 @@
-# claude-bootstrap: rendered from common/.github/workflows/template-drift-watch.yml.tmpl @ v1.53.0 sha256:23d15375ea60326ce18905c1114793f79d2dcddd22818160d16375205a2f8fd0
+# claude-bootstrap: rendered from common/.github/workflows/template-drift-watch.yml.tmpl @ v1.70.2 sha256:4132fd65cb3e08c748307799e3ece7d0ca23d423b7b92093a7ad4e905c572c73
 # (do not edit this line; the maintenance pipeline uses it for drift detection — see #213)
 # Scheduled template-drift watcher (#402).
 #
@@ -40,10 +40,10 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Check out this repo
-        uses: actions/checkout@v6
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
 
       - name: Check out the plugin family (latest templates)
-        uses: actions/checkout@v6
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
         with:
           repository: "timo-jakob/timos-claude-code-plugins"
           # Moving tip on purpose — drift = "newer templates exist than what

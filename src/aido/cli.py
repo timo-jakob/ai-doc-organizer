@@ -15,6 +15,7 @@ from pathlib import Path
 
 from ruamel.yaml import YAML
 
+from aido._fspath import validated_fs_path
 from aido.store.connection import connect
 from aido.store.migrations import init_db
 from aido.store.persons import add_alias, create_person, get_person_by_slug
@@ -83,14 +84,12 @@ def main(argv: Sequence[str] | None = None) -> int:
 
 
 def _cmd_init(args: argparse.Namespace) -> int:
+    # Validate/canonicalize operator-supplied CLI paths before the mkdir sinks
+    # (pythonsecurity:S8707).
     if args.archive_root is not None:
-        args.archive_root.mkdir(
-            parents=True, exist_ok=True
-        )  # nosonar pythonsecurity:S8707 — path is an argparse argument supplied by the human operator, not derived from LLM output
+        validated_fs_path(args.archive_root).mkdir(parents=True, exist_ok=True)
     if args.scan_inbox is not None:
-        args.scan_inbox.mkdir(
-            parents=True, exist_ok=True
-        )  # nosonar pythonsecurity:S8707 — path is an argparse argument supplied by the human operator, not derived from LLM output
+        validated_fs_path(args.scan_inbox).mkdir(parents=True, exist_ok=True)
 
     with connect(args.db) as conn:
         init_db(conn)
@@ -140,9 +139,9 @@ def _seed_person(conn, entry: dict) -> None:
 
 def _seed_from_yaml(conn, seed_path: Path) -> None:
     yaml = YAML(typ="safe")
-    data = (
-        yaml.load(seed_path.read_text(encoding="utf-8")) or {}
-    )  # nosonar pythonsecurity:S8707 — seed_path is an argparse argument supplied by the human operator, not derived from LLM output
+    # Validate/canonicalize the operator-supplied seed path before reading it
+    # (pythonsecurity:S8707).
+    data = yaml.load(validated_fs_path(seed_path).read_text(encoding="utf-8")) or {}
     with conn:
         for entry in data.get("persons", []) or []:
             _seed_person(conn, entry)
