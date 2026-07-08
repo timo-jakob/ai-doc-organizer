@@ -5,7 +5,7 @@
 # silently moving us to an older rebuild. Refresh via:
 #   docker pull python:3.14-slim-bookworm && \
 #   docker inspect --format '{{.RepoDigests}}' python:3.14-slim-bookworm
-FROM python:3.14-slim-bookworm@sha256:a9bee15510a364124aa24692899d269835683b883de42f7ebec8c293cf679ccb AS base
+FROM python:3.14-slim-bookworm@sha256:a70519002c49552ea0a853de47599cf40479b001bd7a624f1112eaf44dcaccc7 AS base
 
 # Node.js is needed because the Claude Agent SDK spawns the bundled Claude
 # Code CLI as a subprocess.
