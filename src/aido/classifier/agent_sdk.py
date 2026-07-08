@@ -16,12 +16,12 @@ from aido.store.persons import list_aliases_for, list_persons
 from aido.store.taxonomy import list_categories, list_doctypes
 from aido.types import ClassificationResult
 
-# Input to this regex is always Claude's API response text, not attacker-
-# supplied data.  A ReDoS attack requires an adversary who can feed arbitrary
-# strings into the regex engine; Claude's output is developer-controlled.
-# The pattern is also intentionally lazy (.*?) to match the minimal span, which
-# limits backtracking on well-formed responses.  # nosonar python:S5852
-_TAG_RE = re.compile(r"<classification>\s*(.*?)\s*</classification>", re.DOTALL)
+# Capture the classification payload. The lazy `.*?` between the two literal
+# tags matches the minimal span with linear scanning; the surrounding `\s*`
+# trimming was dropped (it overlapped with `.` under re.DOTALL and made the
+# pattern super-linear -- python:S8786) because json.loads already ignores
+# leading/trailing whitespace in the captured group.
+_TAG_RE = re.compile(r"<classification>(.*?)</classification>", re.DOTALL)
 
 
 def build_system_prompt(conn: sqlite3.Connection) -> str:

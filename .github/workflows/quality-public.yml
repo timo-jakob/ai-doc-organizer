@@ -1,10 +1,18 @@
+# claude-bootstrap: rendered from public/.github/workflows/quality-public.yml.tmpl @ v1.70.2 sha256:d956c0a9b18e609c7dc3458b472931d835a0ec0fad4a5a0da5d87d3e160cb95e
+# (do not edit this line; the maintenance pipeline uses it for drift detection — see #213)
 # Quality + security pipeline for PUBLIC repositories.
 # Runs on github-hosted runners. Uses SonarCloud for static analysis +
-# coverage and Snyk for security (code + open source + container).
+# coverage. Snyk's GitHub App handles SAST + Open Source as PR-time
+# advisory checks (and Snyk's auto-Fix-PR flow for OSS — see SETUP.md
+# section 2.6). This workflow only runs the `image` channel: Snyk
+# container scan on the built Docker image, which the GitHub App can't
+# see.
 #
-# Image publishing: built image is scanned, then pushed to GitHub Container
-# Registry (ghcr.io/<owner>/<repo>) on merge to main + release events. The
-# scan gates the push — a vulnerable image never reaches the registry.
+# Image publishing: built image is scanned (`image` job), then pushed to
+# GitHub Container Registry (ghcr.io/<owner>/<repo>) on merge to main +
+# release events by the separate `push-and-sign` job (`needs: image`). The
+# scan gates the push — a vulnerable image never reaches the registry — and
+# only the push job holds write-capable permissions (#547).
 
 name: Quality (public)
 
@@ -31,9 +39,12 @@ on:
     - cron: "0 6 * * 1"
   workflow_dispatch:
 
-# Least-privilege workflow defaults. The `image` job widens its own
-# permissions for GHCR push + cosign keyless signing; nothing else
-# needs anything beyond `contents: read`.
+# Least-privilege workflow defaults. Individual jobs may widen as needed:
+# only the `push-and-sign` job (push/release events, never PRs) needs
+# `packages: write` + `id-token: write` for GHCR push and cosign keyless
+# signing; nothing else needs anything beyond `contents: read`. Job
+# permissions can't be gated per-step, so the write grants live in a job
+# that PR runs never execute (#547).
 permissions:
   contents: read
 
@@ -46,16 +57,25 @@ env:
   IMAGE_NAME: ${{ github.repository }}
 
 jobs:
+  # --- Tests + coverage per language ----------------------------------------
+  # The bootstrap skill keeps only the steps matching detected languages.
+  # Swift is the exception: it has its own macOS job below (the SWIFT block),
+  # not a step section here — xcodebuild/xcrun don't exist on Linux runners.
+
+  # --- LINUX_TESTS-START -------------------------------------------------------
   test-and-coverage:
     runs-on: ubuntu-latest
-    timeout-minutes: 20
     steps:
-      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10  # v6
+      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
         with:
-          fetch-depth: 0   # SonarCloud needs full history for blame
+          # Full history: diff-cover needs a merge base with origin/<base>,
+          # and a shallow PR checkout has none (its parent link is cut).
+          fetch-depth: 0
 
+
+      # --- PYTHON-START ----------------------------------------------------
       - name: Setup Python
-        uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405  # v6
+        uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6
         with:
           python-version: "3.14"
           cache: "pip"
@@ -71,29 +91,34 @@ jobs:
 
       - name: Install + test (Python)
         run: |
+          # Install runtime deps if requirements.txt exists; install dev
+          # deps from pyproject.toml; ensure pytest-cov is present even if
+          # the project doesn't track it as a dev dep.
           [[ -f requirements.txt ]] && pip install -r requirements.txt
           pip install -e ".[dev]"
           pip install pytest-cov
-          pytest --cov --cov-report=xml --cov-report=term
+          # Pass --cov=<source-dir> explicitly so coverage.py tracks every
+          # file under it, including modules no test imports. Without this,
+          # a never-imported new module is absent from coverage.xml entirely,
+          # and diff-cover reports "No lines with coverage information" on
+          # its diffed lines — the gate fires correctly but looks like a
+          # tool failure rather than a coverage shortfall. See issue #101.
+          if [[ -d src ]]; then COV_SRC="src"; else COV_SRC="."; fi
+          pytest --cov="$COV_SRC" --cov-report=xml --cov-report=term
 
-      # Local mirror of the diff-cover pre-push hook: enforce 90% coverage
-      # on new lines vs origin/main. PR-only because there's no "new code"
-      # diff to compute on push to the default branch. Uses the cobertura
-      # coverage.xml produced above.
+      # Coverage floor — the load-bearing 90% new-code enforcer on
+      # SonarCloud free (where custom Quality Gate assignment is paywalled
+      # and the default `Sonar way` gate only requires 80%). Uses
+      # `diff-cover` on the cobertura `coverage.xml` produced above.
+      # PR-only — on push to the default branch there's no "new code" diff
+      # to enforce against.
       - name: Install diff-cover (Python — coverage floor)
         if: github.event_name == 'pull_request'
         run: pip install 'diff-cover>=9'
       # BASE_REF is funnelled through `env:` rather than inlined into
       # `run:` to keep semgrep's run-shell-injection rule happy —
       # github-context values are untrusted input (a PR author can target
-      # a maliciously-named base branch). Applies to both steps below.
-      - name: Fetch base ref for diff-cover (Python)
-        if: github.event_name == 'pull_request'
-        env:
-          BASE_REF: ${{ github.base_ref }}
-        run: |
-          git fetch --no-tags --prune --depth=100 origin \
-            "+refs/heads/${BASE_REF}:refs/remotes/origin/${BASE_REF}"
+      # a maliciously-named base branch). Applies to the coverage step below.
       - name: Coverage floor — 90% on new code (Python)
         if: github.event_name == 'pull_request'
         env:
@@ -103,9 +128,10 @@ jobs:
             --compare-branch="origin/${BASE_REF}" \
             --fail-under=90 \
             --show-uncovered
+      # --- PYTHON-END ------------------------------------------------------
 
       - name: Upload coverage artifact
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a  # v7
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
         with:
           name: coverage-reports
           path: |
@@ -113,35 +139,68 @@ jobs:
             coverage.out
             coverage.lcov
             coverage/lcov.info
+            build/reports/jacoco/test/jacocoTestReport.xml
           if-no-files-found: ignore
+  # --- LINUX_TESTS-END ---------------------------------------------------------
 
   # --- SonarCloud -----------------------------------------------------------
   sonarcloud:
     needs: test-and-coverage
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10  # v6
+      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
         with:
           fetch-depth: 0
       - name: Download coverage
-        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c  # v8
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8
         with:
           name: coverage-reports
           path: .
         # No continue-on-error: if test-and-coverage didn't produce coverage,
         # Sonar should fail loudly rather than silently report green without it.
       - name: SonarCloud scan
-        uses: SonarSource/sonarqube-scan-action@7006c4492b2e0ee0f816d36501671557c97f5995  # v8  # nosemgrep: generic.secrets.security.detected-sonarqube-docs-api-key.detected-sonarqube-docs-api-key
+        # The 40-hex commit pin trips semgrep's SonarQube-docs-API-key
+        # detector; it's a git SHA, not a credential.
+        # nosemgrep: generic.secrets.security.detected-sonarqube-docs-api-key.detected-sonarqube-docs-api-key
+        uses: SonarSource/sonarqube-scan-action@713881670b6b3676cda39549040e2d88c70d582e # v8
         env:
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
           SONAR_HOST_URL: https://sonarcloud.io
 
-  # Snyk Code (SAST) + Snyk Open Source (deps) are scanned by Snyk's GitHub
-  # integration directly — the App posts PR status checks without a CI job.
-  # We don't run `snyk code test` / `snyk test` here because CLI-invoked
-  # scans count as PRIVATE tests against the org's monthly quota regardless
-  # of repo visibility. The container scan (further down) stays in CI: the
-  # integration can't see an image that only exists after the build step.
+  # --- Snyk source-code + open-source scans -----------------------------------
+  # NOT a CI job. Snyk runs via the **Snyk GitHub integration** (App), never
+  # against SNYK_TOKEN in CI — a `snyk test`/`snyk code test` job would be
+  # redundant with the integration and double-count the monthly test quota.
+  #
+  # Two integration features (configured in the Snyk Web UI — see SETUP.md
+  # §2.5–2.6) do the work, and they are deliberately split:
+  #
+  #   1. Pull request status checks
+  #      Snyk → Settings → Integrations → GitHub → Pull request status checks
+  #        Open Source security and licenses → DISABLE
+  #            Third-party CVEs surface and change independently of our code —
+  #            a clean release goes vulnerable the moment a new CVE lands — so
+  #            they must NOT gate a build. They're handled out-of-band: daily
+  #            Snyk monitoring → auto-fix PRs → the maintenance pipeline, plus
+  #            Dependabot. (Leaving this ON yields the `security/snyk` check.)
+  #        Code analysis                     → DISABLE
+  #            SAST on our OWN code is already covered by CodeQL (the required
+  #            `analyze (<lang>)` checks). Snyk Code adds no incremental
+  #            coverage on the free tier, where its monthly test cap makes
+  #            `code/snyk` go ERROR ("Code test limit reached") — and that
+  #            advisory legacy status used to silently skip the Claude Approver
+  #            (#387). Disabling it drops the `code/snyk` check; CodeQL stays
+  #            the SAST gate.
+  #
+  #   2. Continuous monitoring + Automatic Fix PRs
+  #      Daily re-test of the imported target; when a vulnerable dependency has
+  #      a known fix, Snyk opens a `snyk-fix-*` PR that the maintenance pipeline
+  #      triages alongside Dependabot. This — NOT the PR status checks — is what
+  #      produces fix PRs.
+  #
+  # The `image` job below stays a CI job because the integration only scans the
+  # Dockerfile statically — it doesn't build the image and inspect installed
+  # packages.
 
   # --- License compliance (dependencies) ------------------------------------
   # Uses Trivy as an open-source license scanner. Catches deps shipping
@@ -150,8 +209,8 @@ jobs:
   license-fs:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10  # v6
-      - uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25  # v0.36.0
+      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
+      - uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
         with:
           scan-type: "fs"
           scan-ref: "."
@@ -161,28 +220,90 @@ jobs:
           format: "table"
           trivy-config: trivy.yaml
 
-  # Container image pipeline.
+  # --- DOCKER-START ---------------------------------------------------------
+  # Container image pipeline — two jobs (#547):
   #
-  # PRs                     → build linux/amd64 only, scan, no push (fast)
+  #   image (scan)      → PR + push + release: build linux/amd64, scan.
+  #                       `contents: read` only — PR runs never execute a
+  #                       job holding write-capable permissions.
+  #   push-and-sign     → push/release only (`needs: image`): GHCR login,
+  #                       multi-arch push, SBOM, provenance, cosign. Holds
+  #                       `packages: write` + `id-token: write` — job
+  #                       permissions can't be gated per-step, so the write
+  #                       grants live in a job PRs never run.
+  #
+  # PR touching container files → build linux/amd64 only, scan, no push (gate)
+  # PR NOT touching container files → no scan; the required `image` check
+  #                           passes through (#386 — app/dependency PRs must not
+  #                           be blocked by pre-existing base-image CVEs they
+  #                           can't influence; "working on the app → app checks,
+  #                           working on the image → container checks").
   # push to main / release  → build linux/amd64 + linux/arm64, scan, push to GHCR
+  #
+  # `image` stays a single required branch-protection context that ALWAYS
+  # resolves: the job runs on every non-doc PR, but the heavy build+scan steps
+  # are gated on `scan_decision` so a non-container PR ends green without
+  # scanning. (Doc-only PRs are covered by the noop companion workflow.)
+  # `push-and-sign` never runs on PRs, so it is NOT a required check and
+  # needs no noop mirror.
   image:
     runs-on: ubuntu-latest
     permissions:
       contents: read
-      packages: write    # ghcr.io push
-      id-token: write    # cosign keyless OIDC signing
     steps:
-      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10  # v6
+      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
+        with:
+          # Full history so the container-change detection below can diff the
+          # PR against its base SHA.
+          fetch-depth: 0
 
-      - name: Set up QEMU (for arm64 emulation)
-        uses: docker/setup-qemu-action@06116385d9baf250c9f4dcb4858b16962ea869c3  # v4
+      # Decide whether the container scan should gate this run (#386). The scan
+      # gates ONLY when the change touches the container definition; an
+      # app/dependency PR that doesn't can't affect base-image CVEs, so it skips
+      # the scan and the required `image` check passes. Non-PR events (push to
+      # the default branch, release, schedule, manual) always scan. Fails SAFE:
+      # any error computing the diff falls back to scanning.
+      - name: Decide whether to scan the image
+        id: scan_decision
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+        run: |
+          if [ "$EVENT_NAME" != "pull_request" ]; then
+            echo "do_scan=true" >> "$GITHUB_OUTPUT"
+            echo "Non-PR event ($EVENT_NAME) — scanning the image."
+            exit 0
+          fi
+          container_re='(^|/)Dockerfile|\.dockerfile$|(^|/)\.dockerignore$|(^|/)(docker-compose|compose)\.ya?ml$|(^|/)\.snyk$'
+          if ! changed=$(git diff --name-only "$BASE_SHA" HEAD 2>/dev/null); then
+            echo "do_scan=true" >> "$GITHUB_OUTPUT"
+            echo "::warning::Could not compute the PR diff against $BASE_SHA — scanning to be safe."
+            exit 0
+          fi
+          if printf '%s\n' "$changed" | grep -qE "$container_re"; then
+            echo "do_scan=true" >> "$GITHUB_OUTPUT"
+            echo "Container-relevant files changed — running the image scan gate:"
+            printf '%s\n' "$changed" | grep -E "$container_re" || true
+          else
+            echo "do_scan=false" >> "$GITHUB_OUTPUT"
+            echo "::notice::No container files changed; skipping image scan (#386). Required 'image' check passes."
+          fi
 
+      # ARTIFACT BUILD STEPS anchor (#545): if the Dockerfile COPYs build
+      # outputs (build/, dist/, target/, ...), the bootstrap inserts the
+      # steps that produce them here — gated on scan_decision like the
+      # image build below (e.g. setup-java + setup-gradle + the Gradle dist
+      # task). Mirror the same steps in push-and-sign, which builds the
+      # image again on its own runner.
+
+      # No QEMU here: the scan build is amd64-only on an amd64 runner. QEMU
+      # lives in push-and-sign, where the multi-arch build needs it.
       - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@d7f5e7f509e45cec5c76c4d5afdd7de93d0b3df5  # v4
+        uses: docker/setup-buildx-action@bb05f3f5519dd87d3ba754cc423b652a5edd6d2c # v4
 
       - name: Compute image tags
         id: meta
-        uses: docker/metadata-action@80c7e94dd9b9319bd5eb7a0e0fe9291e23a2a2e9  # v6
+        uses: docker/metadata-action@dc802804100637a589fabce1cb79ff13a1411302 # v6
         with:
           images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
           tags: |
@@ -193,8 +314,13 @@ jobs:
             type=semver,pattern={{major}}.{{minor}}
             type=semver,pattern={{major}}
 
+      # Single-arch build for scanning. Loading multi-arch images into the
+      # local docker daemon isn't supported, so we keep this step amd64-only
+      # — vulnerability scanners run on dependency manifests + distro
+      # packages, which are arch-invariant at the source level.
       - name: Build image (amd64 only, for scanning)
-        uses: docker/build-push-action@f9f3042f7e2789586610d6e8b85c8f03e5195baf  # v7
+        if: steps.scan_decision.outputs.do_scan == 'true'
+        uses: docker/build-push-action@53b7df96c91f9c12dcc8a07bcb9ccacbed38856a # v7
         with:
           context: .
           platforms: linux/amd64
@@ -203,38 +329,106 @@ jobs:
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
           cache-from: type=gha
-          # mode=min on the PR build: only the final layer is cached, so a
+          # mode=min on PR builds: only the final layer is cached, so a
           # malicious fork PR can't poison intermediate layer keys that a
-          # later push from the trusted ref would consume. The push build
-          # below uses mode=max because it's already gated to trusted events.
+          # later push from the trusted repo would consume. The push build
+          # below uses mode=max because it's already gated to push events
+          # from the trusted ref.
           cache-to: type=gha,mode=min
 
       - name: Pick a tag for scanning
         id: pick
+        if: steps.scan_decision.outputs.do_scan == 'true'
         run: |
           tag=$(echo '${{ steps.meta.outputs.tags }}' | head -n1)
           echo "tag=$tag" >> "$GITHUB_OUTPUT"
 
       - name: Snyk container scan
-        uses: snyk/actions/setup@9adf32b1121593767fc3c057af55b55db032dc04  # v1.0.0
-      - run: |
+        if: steps.scan_decision.outputs.do_scan == 'true'
+        uses: snyk/actions/setup@9adf32b1121593767fc3c057af55b55db032dc04 # v1.0.0
+      - if: steps.scan_decision.outputs.do_scan == 'true'
+        run: |
           # --policy-path makes Snyk read .snyk ignores for container scans
           # (it doesn't auto-discover the policy file in container mode).
+          # --json-file-output writes the full machine-readable report
+          # regardless of exit code, so the scan still gates the GHCR push
+          # below while also producing the artifact harvested next.
           snyk container test "${{ steps.pick.outputs.tag }}" \
-            --severity-threshold=high --file=Dockerfile --policy-path=.snyk
+            --severity-threshold=high --file=Dockerfile --policy-path=.snyk \
+            --json-file-output=snyk-container.json
         env:
           SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
 
-      # License-image scan removed: Trivy's `restricted` classification
-      # flags every Debian distro GPL/LGPL transitively included by tesseract,
-      # poppler, etc. We use those packages via OS dynamic linking, not by
-      # embedding them in a derivative, so copyleft obligations don't apply.
-      # The license-fs job above covers what's actually relevant: our own
-      # Python dependencies, declared in pyproject.toml + requirements.txt.
+      # Harvest the container scan as a CI artifact so the maintenance
+      # pipeline (/development:maintenance) can ingest base-image CVEs and
+      # triage them — fix the safely-fixable, or propose a justified .snyk
+      # ignore with an expiry. Gated to push/release like the SBOM export
+      # in push-and-sign: the artifact describes the pushed image, and the
+      # gather only harvests default-branch push runs (anti-spoofing).
+      # `always()` so it still uploads when the scan step exited non-zero on
+      # findings — that is precisely when there are CVEs worth ingesting.
+      - name: Upload Snyk container scan (for maintenance ingestion)
+        if: always() && (github.event_name == 'push' || github.event_name == 'release')
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        with:
+          name: snyk-container-scan
+          path: snyk-container.json
+          if-no-files-found: error
+          retention-days: 90
+
+      # NOTE: image-level license scan intentionally omitted. Trivy's
+      # `restricted` classification flags every transitive Debian GPL/LGPL
+      # library inside the base image (libxml2, libgnutls, libreadline, etc.).
+      # We use those via OS-level dynamic linking, not by embedding them in
+      # a derivative — copyleft obligations don't apply. The license-fs job
+      # already covers what matters: the project's own declared dependencies.
+
+  # Publish job — the ONLY job holding write-capable permissions, and it
+  # never runs on PRs. `needs: image` makes the scan gate the push: a
+  # vulnerable image never reaches the registry. The multi-arch build uses
+  # QEMU emulation on the x86 runner; slower than native arm64 but free on
+  # GitHub-hosted ubuntu-latest. If build time becomes a problem, split into
+  # a matrix using native ubuntu-24.04-arm runners and merge manifests with
+  # `docker manifest create`.
+  push-and-sign:
+    needs: image
+    if: github.event_name == 'push' || github.event_name == 'release'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write    # ghcr.io push
+      id-token: write    # cosign keyless OIDC signing
+    steps:
+      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
+
+      # ARTIFACT BUILD STEPS anchor (#545): mirror the artifact build steps
+      # from the image (scan) job here, unconditional — this job builds the
+      # image again and the scan job's workspace doesn't carry over.
+
+      - name: Set up QEMU (for arm64 emulation)
+        uses: docker/setup-qemu-action@96fe6ef7f33517b61c61be40b68a1882f3264fb8 # v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@bb05f3f5519dd87d3ba754cc423b652a5edd6d2c # v4
+
+      # Recomputed rather than passed from the scan job — step outputs don't
+      # cross job boundaries, and metadata-action is deterministic for the
+      # same ref.
+      - name: Compute image tags
+        id: meta
+        uses: docker/metadata-action@dc802804100637a589fabce1cb79ff13a1411302 # v6
+        with:
+          images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
+          tags: |
+            type=ref,event=branch
+            type=sha,format=short,prefix=sha-
+            type=raw,value=latest,enable={{is_default_branch}}
+            type=semver,pattern={{version}}
+            type=semver,pattern={{major}}.{{minor}}
+            type=semver,pattern={{major}}
 
       - name: Login to GHCR
-        if: github.event_name == 'push' || github.event_name == 'release'
-        uses: docker/login-action@650006c6eb7dba73a995cc03b0b2d7f5ca915bee  # v4
+        uses: docker/login-action@af1e73f918a031802d376d3c8bbc3fe56130a9b0 # v4
         with:
           registry: ${{ env.REGISTRY }}
           username: ${{ github.actor }}
@@ -242,64 +436,80 @@ jobs:
 
       - name: Build + push multi-arch image (with SBOM + provenance)
         id: build-push
-        if: github.event_name == 'push' || github.event_name == 'release'
-        uses: docker/build-push-action@f9f3042f7e2789586610d6e8b85c8f03e5195baf  # v7
+        uses: docker/build-push-action@53b7df96c91f9c12dcc8a07bcb9ccacbed38856a # v7
         with:
           context: .
           platforms: linux/amd64,linux/arm64
           push: true
+          # Attaches a CycloneDX JSON SBOM (generated by Syft via BuildKit)
+          # as an OCI artifact referencing the image manifest. Discoverable
+          # via `docker buildx imagetools inspect <image> --format '{{json .SBOM}}'`.
           sbom: true
+          # SLSA provenance attestation — records build steps, source repo,
+          # and inputs. Verifiable via cosign / slsa-verifier.
           provenance: mode=max
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
+      - name: Pick a tag for the SBOM export
+        id: pick
+        run: |
+          tag=$(echo '${{ steps.meta.outputs.tags }}' | head -n1)
+          echo "tag=$tag" >> "$GITHUB_OUTPUT"
+
+      # Export the SBOM as a CI artifact for human inspection. Uses Syft
+      # directly so the output matches the Buildx attestation byte-for-byte.
       - name: Export SBOM as CI artifact
-        if: github.event_name == 'push' || github.event_name == 'release'
-        uses: anchore/sbom-action@e22c389904149dbc22b58101806040fa8d37a610  # v0.24.0
+        uses: anchore/sbom-action@e22c389904149dbc22b58101806040fa8d37a610 # v0.24.0
         with:
           image: ${{ steps.pick.outputs.tag }}
           format: cyclonedx-json
           output-file: sbom.cdx.json
 
       - name: Validate SBOM is well-formed CycloneDX
-        if: github.event_name == 'push' || github.event_name == 'release'
         run: |
-          docker run --rm -v "$PWD:/work" cyclonedx/cyclonedx-cli:0.32.0 \
+          docker run --rm -v "$PWD:/work" cyclonedx/cyclonedx-cli:v0.32.0 \
             validate --input-file /work/sbom.cdx.json --input-format json --fail-on-errors
 
       - name: Upload SBOM artifact
-        if: github.event_name == 'push' || github.event_name == 'release'
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a  # v7
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
         with:
           name: sbom-cyclonedx-${{ github.sha }}
           path: sbom.cdx.json
           retention-days: 90
 
+      # Sign the image with Sigstore cosign — keyless OIDC, no key
+      # management. The signature is stored alongside the image in the
+      # registry. Verifiable with `cosign verify` using the workflow's
+      # OIDC certificate identity.
       - name: Install cosign
-        if: github.event_name == 'push' || github.event_name == 'release'
-        uses: sigstore/cosign-installer@6f9f17788090df1f26f669e9d70d6ae9567deba6  # v4.1.2
+        uses: sigstore/cosign-installer@6f9f17788090df1f26f669e9d70d6ae9567deba6 # v4.1.2
 
       - name: Sign image with cosign (keyless OIDC)
-        if: github.event_name == 'push' || github.event_name == 'release'
         env:
           IMAGE_DIGEST: ${{ steps.build-push.outputs.digest }}
           TAGS: ${{ steps.meta.outputs.tags }}
+        # Sign every produced tag, by digest. Signing by digest avoids
+        # tag-mutation race conditions: even if `latest` is overwritten,
+        # the signature attached to the digest stays valid for that
+        # specific image content.
         run: |
           for tag in $TAGS; do
             cosign sign --yes "${tag}@${IMAGE_DIGEST}"
           done
+  # --- DOCKER-END -----------------------------------------------------------
 
   # --- Semgrep (free OSS rules) ---------------------------------------------
   semgrep:
     runs-on: ubuntu-latest
     container:
-      # Pinned; bump in lockstep with the semgrep entry in
-      # .pre-commit-config.yaml so local + CI behave identically.
+      # Pinned. Matches the pre-commit hook's semgrep version so local + CI
+      # behave identically. Bump in lockstep with `.pre-commit-config.yaml`.
       image: returntocorp/semgrep:1.163.0
     steps:
-      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10  # v6
+      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
       - run: semgrep ci --config=auto
         env:
           SEMGREP_APP_TOKEN: ${{ secrets.SEMGREP_APP_TOKEN }}   # optional
@@ -307,13 +517,14 @@ jobs:
   # --- Pre-commit (CI backstop) ---------------------------------------------
   # Catches contributors who bypassed local hooks with `git commit
   # --no-verify` or pushed from a machine without pre-commit installed.
+  # Runs the exact same hooks as locally.
   pre-commit:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10  # v6
+      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
         with:
-          fetch-depth: 0
-      - uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405  # v6
+          fetch-depth: 0   # some hooks (gitleaks) want history
+      - uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6
         with:
           python-version: "3.14"
-      - uses: pre-commit/action@2c7b3805fd2a0fd8c1884dcaebf91fc102a13ecd  # v3.0.1
+      - uses: pre-commit/action@2c7b3805fd2a0fd8c1884dcaebf91fc102a13ecd # v3.0.1
