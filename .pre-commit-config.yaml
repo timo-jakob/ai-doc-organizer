@@ -68,5 +68,5 @@ repos:
         language: python
         additional_dependencies: ["diff-cover>=9"]
         pass_filenames: false
-        always_run: true
+        files: \.py$
         stages: [pre-push]
