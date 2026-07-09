@@ -80,9 +80,9 @@ def add_alias_route(person_id: int):
     try:
         with _state().mutations.lock, _conn():
             row = add_alias(_conn(), person_id=person_id, alias=body["alias"])
+            return jsonify({"ok": True, "id": row.id})
     except sqlite3.IntegrityError as e:
         abort(400, description=str(e))
-    return jsonify({"ok": True, "id": row.id})
 
 
 @bp.post("/settings/categories")
