@@ -1,11 +1,11 @@
-# Bookworm (Debian 12) base, pinned to a specific digest (rebuild 2026-05-31).
+# Bookworm (Debian 12) base, pinned to a specific digest (rebuild 2026-07-11).
 # We switched off the default `python:3.14-slim` (trixie) because Debian 13
 # hadn't yet shipped the libxml2 / libexpat1 patches Snyk was flagging;
 # Bookworm has had those for longer. Pinning to digest stops Buildx from
 # silently moving us to an older rebuild. Refresh via:
 #   docker pull python:3.14-slim-bookworm && \
 #   docker inspect --format '{{.RepoDigests}}' python:3.14-slim-bookworm
-FROM python:3.14-slim-bookworm@sha256:a70519002c49552ea0a853de47599cf40479b001bd7a624f1112eaf44dcaccc7 AS base
+FROM python:3.14-slim-bookworm@sha256:4ff4b92a68355dbdb52584ab3391dff8d371a61d4e063468bfd0130e3189c6d9 AS base
 
 # Node.js is needed because the Claude Agent SDK spawns the bundled Claude
 # Code CLI as a subprocess.
