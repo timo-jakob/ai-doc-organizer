@@ -64,9 +64,35 @@ repos:
     hooks:
       - id: coverage-floor
         name: Coverage floor (90% on new code) — requires recent pytest --cov-report=xml
-        entry: diff-cover coverage.xml --compare-branch=origin/main --fail-under=90
+        entry: >-
+          bash -c 'base=origin/main;
+          if git rev-parse -q --verify "$base^{commit}" >/dev/null 2>&1 &&
+          [ -z "$(git diff --name-only --diff-filter=d "$base...HEAD" -- "*.py")" ];
+          then exit 0; fi;
+          top="$(git rev-parse --show-toplevel)";
+          src="$(sed -n "s|.*<source>\(.*\)</source>.*|\1|p" coverage.xml 2>/dev/null | head -n 1)";
+          case "$src" in
+          ""|.|"$top"|"$top"/*) ;;
+          /*) echo "coverage-floor: coverage.xml was recorded against $src — not this worktree ($top)." >&2;
+          echo "Its numbers cannot judge this tree (stale or shared-venv editable install, #518). Create a venv" >&2;
+          echo "in THIS worktree (python -m venv .venv && .venv/bin/pip install -e .), re-run" >&2;
+          echo "pytest --cov --cov-report=xml, then push again." >&2;
+          exit 1;;
+          esac;
+          exec diff-cover coverage.xml --compare-branch=origin/main --fail-under=90'
         language: python
         additional_dependencies: ["diff-cover>=9"]
         pass_filenames: false
-        files: \.py$
+        # Run ONLY when this branch's diff vs origin/main touches
+        # Python — the guard at the top of `entry` no-ops (exit 0) when it
+        # doesn't, so a docs/config/YAML-only push needs no coverage.xml (no test
+        # build just to push a comment). We key on the origin/<default>...HEAD
+        # diff, NOT pre-commit's `files:` filter: on a brand-new branch push git
+        # reports the remote ref as all-zeros, so pre-commit diffs against the
+        # empty tree and EVERY .py counts as "added" — `files: \.py$` then
+        # over-fires and demands a vacuous report (#713). The entry guard uses
+        # the same diff-base as CI + ensure-coverage-precondition.zsh, so local
+        # and CI agree. `always_run` (not `files:`) so the guard always decides.
+        always_run: true
         stages: [pre-push]
+  # --- PYTHON-END ------------------------------------------------------------
