@@ -1,6 +1,6 @@
+#!/usr/bin/env zsh
 # claude-bootstrap: rendered from common/scripts/docs-nav-to-chapters.zsh @ v1.98.1 sha256:af6b5835f009d78bd2807924570d3c1ff8b4dad9bc88eaff6e26c6543d9862b3
 # (do not edit this line; the maintenance pipeline uses it for drift detection — see #213)
-#!/usr/bin/env zsh
 # docs-nav-to-chapters.zsh — emit the docs source files in MkDocs `nav:` order,
 # one per line, prefixed with the configured docs dir. This is the single
 # source of chapter order for the pandoc PDF/ePub build (epic #744 slice (c),
