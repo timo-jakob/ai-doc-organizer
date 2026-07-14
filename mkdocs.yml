@@ -1,0 +1,102 @@
+# claude-bootstrap: rendered from common/mkdocs.yml.tmpl @ v1.98.1 sha256:be3bd5ba5af6d6fdde449512b14f051cd1a2ccb8384776a221dace7819079bca
+# (do not edit this line; the maintenance pipeline uses it for drift detection — see #213)
+# MkDocs-Material configuration — installed by /development:bootstrap (#766,
+# epic #745). The docs toolchain is CI-side only (requirements-docs.txt);
+# nothing here becomes an app dependency. The nav below is the single source
+# of structure: the HTML site, and (via scripts/docs-nav-to-chapters.zsh) the
+# pandoc PDF/ePub chapter order, are both derived from it.
+site_name: ai-doc-organizer
+site_description: >-
+  End-user documentation for ai-doc-organizer.
+site_url: https://timo-jakob.github.io/ai-doc-organizer/
+repo_url: https://github.com/timo-jakob/ai-doc-organizer
+repo_name: timo-jakob/ai-doc-organizer
+edit_uri: edit/main/docs/
+docs_dir: docs
+site_dir: site
+
+# The docs/superpowers tree holds internal design specs/plans (the family's
+# brainstorming workflow writes there in every repo), not published manual
+# pages — keep it out of the built site so --strict doesn't demand it in the
+# nav (#775).
+exclude_docs: |
+  superpowers/
+
+theme:
+  name: material
+  palette:
+    - media: "(prefers-color-scheme: light)"
+      scheme: default
+      primary: indigo
+      accent: indigo
+      toggle:
+        icon: material/brightness-7
+        name: Switch to dark mode
+    - media: "(prefers-color-scheme: dark)"
+      scheme: slate
+      primary: indigo
+      accent: indigo
+      toggle:
+        icon: material/brightness-4
+        name: Switch to light mode
+  features:
+    - navigation.instant
+    - navigation.tracking
+    - navigation.sections
+    - navigation.top
+    - toc.follow
+    - search.suggest
+    - search.highlight
+    - content.code.copy
+
+plugins:
+  - search
+
+markdown_extensions:
+  - admonition
+  - tables
+  - toc:
+      permalink: true
+  - pymdownx.details
+  - pymdownx.highlight:
+      anchor_linenums: true
+  - pymdownx.inlinehilite
+  - pymdownx.snippets
+  - pymdownx.superfences:
+      custom_fences:
+        - name: mermaid
+          class: mermaid
+          format: !!python/name:pymdownx.superfences.fence_code_format
+
+# Strict internal-link validation is the point of the docs CI gate: a broken
+# link between docs pages must fail the build. Links that intentionally point
+# OUT of the docs tree (repo-root files, code) are written as absolute repo
+# URLs, so they never enter this validation.
+validation:
+  omitted_files: warn
+  absolute_links: warn
+  unrecognized_links: warn
+  anchors: warn
+
+# Every page under docs/ must appear here (mkdocs build --strict fails on an
+# omitted file), and scripts/docs-nav-to-chapters.zsh derives the PDF/ePub
+# chapter order from this list — add new pages to the nav in the same PR.
+nav:
+  - Home: index.md
+  - Tutorials:
+      - tutorials/index.md
+      - Getting started: tutorials/getting-started.md
+  - How-to guides:
+      - how-to/index.md
+# --- SURFACE_CLI-START ---
+      - Use the CLI: how-to/use-the-cli.md
+# --- SURFACE_CLI-END ---
+# --- SURFACE_WEB_UI-START ---
+      - Use the web UI: how-to/use-the-web-ui.md
+# --- SURFACE_WEB_UI-END ---
+  - Reference:
+      - reference/index.md
+  - Explanation:
+      - explanation/index.md
+  - Architecture:
+      - architecture/index.md

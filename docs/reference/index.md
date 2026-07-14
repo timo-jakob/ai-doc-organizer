@@ -1,0 +1,10 @@
+# Reference
+
+Lookup material for ai-doc-organizer: commands, endpoints, configuration
+keys, schemas. Reference pages describe the machinery accurately and
+completely — they don't teach (tutorials) or advise (how-to guides).
+
+Nothing to look up yet — add a page per lookup surface (e.g. `commands.md`,
+`configuration.md`, `api.md`) as the project grows, and link each one here
+**and** in the `nav:` of `mkdocs.yml` — the strict docs build fails on any
+page missing from the nav.

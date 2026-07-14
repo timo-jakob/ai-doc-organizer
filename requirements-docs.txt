@@ -1,0 +1,7 @@
+# claude-bootstrap: rendered from common/requirements-docs.txt @ v1.98.1 sha256:2983a113a0c737ec8cb32d71a070f49027ed8a6967d67cdfddb2e73f35f8d147
+# (do not edit this line; the maintenance pipeline uses it for drift detection — see #213)
+# Docs-site toolchain — CI-side only, never an app dependency. Installed by
+# /development:bootstrap (#766, epic #745); the repo's dependency bot keeps the
+# pin current. mkdocs + pymdown-extensions arrive transitively via
+# mkdocs-material.
+mkdocs-material==9.7.6
