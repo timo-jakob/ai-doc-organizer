@@ -8,3 +8,5 @@ Nothing to look up yet — add a page per lookup surface (e.g. `commands.md`,
 `configuration.md`, `api.md`) as the project grows, and link each one here
 **and** in the `nav:` of `mkdocs.yml` — the strict docs build fails on any
 page missing from the nav.
+
+This probe link is [deliberately broken](../does-not-exist.md) — the strict gate must fail.
