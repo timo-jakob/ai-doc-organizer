@@ -1,4 +1,4 @@
-"""Smoke test: build the image and curl /healthz inside the container."""
+"""Smoke test: build the image, curl /healthz and the web UI pages inside the container."""
 
 from __future__ import annotations
 
@@ -151,6 +151,39 @@ doctypes:
                 ok = True
                 break
         assert ok, "container never responded on /healthz"
+
+        # /healthz returns JSON without rendering a template, so a 200 there
+        # says nothing about templates, static assets, or blueprint
+        # registration (the missing-templates regression shipped through CI
+        # exactly this way). Assert the web UI pages actually render: the
+        # status must be exactly 200 (curl -f alone only fails on >= 400, so
+        # a 3xx redirect would slip through) and the body must contain the
+        # 'aido' brand string that base.html puts on every page.
+        for page in ("/", "/needs-review", "/settings"):
+            # One body file per page: curl -o does not truncate on an empty
+            # body, so a shared file could serve the previous page's content
+            # to the brand assertion.
+            body_file = tmp_path / f"body-{page.strip('/') or 'index'}.html"
+            r = subprocess.run(
+                [
+                    "curl",
+                    "-sS",
+                    "--max-time",
+                    "15",
+                    "-o",
+                    str(body_file),
+                    "-w",
+                    "%{http_code}",
+                    f"http://127.0.0.1:{port}{page}",
+                ],
+                capture_output=True,
+            )
+            assert r.returncode == 0, f"GET {page} failed: {r.stderr.decode(errors='replace')}"
+            status = r.stdout.decode(errors="replace")
+            assert status == "200", f"GET {page} returned HTTP {status}, expected 200"
+            assert body_file.exists(), f"GET {page} returned 200 with an empty body"
+            body = body_file.read_bytes()
+            assert b"aido" in body, f"GET {page} rendered without the 'aido' brand string"
     finally:
         subprocess.run(["docker", "rm", "-f", name], check=False)
         subprocess.run(["docker", "image", "rm", tag], check=False)
