@@ -49,3 +49,12 @@ coverage.xml
 coverage.json
 htmlcov/
 .tox/
+
+# mkdocs build output (built in CI; never committed)
+site/
+
+# local review-loop artifacts (#562)
+.review/
+
+# review-loop telemetry (#566)
+.claude/telemetry/
