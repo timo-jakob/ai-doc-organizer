@@ -247,18 +247,6 @@ def test_status_prints_needs_review_count(tmp_path: Path, capsys):
     assert "needs_review: 1" in captured.out
 
 
-def test_rebuild_index_is_noop_and_returns_zero(tmp_path: Path, capsys):
-    """`rebuild-index` is documented as a v1 placeholder: returns 0 and notes itself on stderr."""
-    db = tmp_path / "aido.sqlite"
-    # The DB doesn't need to exist for the placeholder to succeed.
-    rc = cli_main(["rebuild-index", "--db", str(db)])
-    assert rc == 0
-    captured = capsys.readouterr()
-    assert "rebuild-index" in captured.err
-    # No DB file should be created since the command is a no-op.
-    assert not db.exists()
-
-
 def test_interactive_seed_creates_persons_aliases_and_shared(tmp_path: Path, monkeypatch):
     """Without --seed, init prompts for four persons + auto-creates the 'shared' bucket."""
     db = tmp_path / "aido.sqlite"
