@@ -9,6 +9,7 @@ Subcommands:
 from __future__ import annotations
 
 import argparse
+import sqlite3
 import sys
 from collections.abc import Sequence
 from pathlib import Path
@@ -65,9 +66,10 @@ def main(argv: Sequence[str] | None = None) -> int:
 
     p_reindex = sub.add_parser(
         "rebuild-index",
-        help="scan the archive and reconcile (no-op placeholder for v1)",
+        help="scan the archive and reconcile the decisions table",
     )
     p_reindex.add_argument("--db", type=Path, required=True)
+    p_reindex.add_argument("--archive-root", type=Path, required=True)
 
     args = parser.parse_args(argv)
 
@@ -76,9 +78,7 @@ def main(argv: Sequence[str] | None = None) -> int:
     if args.cmd == "status":
         return _cmd_status(args)
     if args.cmd == "rebuild-index":
-        # v1: keep a no-op stub; real reconciliation lands in a follow-up.
-        print("rebuild-index: no-op placeholder for v1", file=sys.stderr)
-        return 0
+        return _cmd_rebuild_index(args)
     parser.error(f"unknown command: {args.cmd}")
     return 2  # unreachable
 
@@ -110,6 +110,47 @@ def _cmd_init(args: argparse.Namespace) -> int:
                 if get_doctype_by_slug(conn, slug) is None:
                     create_doctype(conn, slug=slug, display_name=name, description=desc)
     print(f"init: db ready at {args.db}")
+    return 0
+
+
+def _cmd_rebuild_index(args: argparse.Namespace) -> int:
+    from aido.reindex import ReconcileError, reconcile, validate_archive_root
+
+    # Validate/canonicalize operator-supplied CLI paths before the filesystem
+    # sinks (pythonsecurity:S8707); reject an unusable archive root before the
+    # DB is even opened so a failed run cannot leave any trace.
+    try:
+        archive_root = validated_fs_path(args.archive_root)
+        validate_archive_root(archive_root)
+        if not validated_fs_path(args.db).is_file():
+            raise ReconcileError(f"no database at {args.db}; run 'aido init' first")
+    except (ReconcileError, ValueError) as e:
+        print(f"rebuild-index: {e}", file=sys.stderr)
+        return 1
+
+    # sqlite3.Error is caught around the whole connection: a corrupt or
+    # non-SQLite --db fails on the very first PRAGMA inside connect().
+    try:
+        with connect(args.db) as conn:
+            summary = reconcile(conn, archive_root)
+    except (ReconcileError, sqlite3.Error) as e:
+        print(f"rebuild-index: {e}", file=sys.stderr)
+        return 1
+    for duplicate in summary.skipped_duplicates:
+        print(
+            f"rebuild-index: warning: {duplicate} duplicates an already-indexed "
+            "document (same content hash); no row added",
+            file=sys.stderr,
+        )
+    for unreadable in summary.skipped_unreadable:
+        print(f"rebuild-index: warning: {unreadable} is unreadable; skipped", file=sys.stderr)
+    if summary.recovered:
+        print(
+            f"rebuild-index: {summary.recovered} previously-failed row(s) recovered "
+            "(file present again)",
+            file=sys.stderr,
+        )
+    print(f"{summary.added} added, {summary.flagged} flagged, {summary.in_sync} in sync")
     return 0
 
 
