@@ -39,6 +39,8 @@ Concepts, rationale, and design background.
 ## Architecture
 
 - [Architecture overview](architecture/index.md)
+- [System Context (C4)](architecture/c4-context.md)
+- [Containers (C4)](architecture/c4-container.md)
 
 ---
 
