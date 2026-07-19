@@ -13,7 +13,9 @@ C4Container
 
     Container_Boundary(ai-doc-organizer_boundary, "ai-doc-organizer") {
         Container(aido, "aido", "Python 3.14 — CLI + web UI")
+        Container(aido-backup, "aido-backup", "offen/docker-volume-backup — scheduled data archive")
     }
 
     Rel(user, aido, "Uses")
+    Rel(aido-backup, aido, "Archives the shared data volume of", "tar")
 ```
