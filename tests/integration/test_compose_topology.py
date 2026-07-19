@@ -10,14 +10,15 @@ from __future__ import annotations
 
 from pathlib import Path
 
-import yaml
+from ruamel.yaml import YAML
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 COMPOSE = REPO_ROOT / "docker-compose.yml"
 
 
 def _services() -> dict:
-    data = yaml.safe_load(COMPOSE.read_text())
+    yaml = YAML(typ="safe")
+    data = yaml.load(COMPOSE.read_text(encoding="utf-8"))
     return data["services"]
 
 
