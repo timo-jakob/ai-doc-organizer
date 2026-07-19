@@ -19,3 +19,20 @@ services:
     environment:
       - ANTHROPIC_API_KEY            # auto-substituted from project .env (if present)
       - TZ=Europe/Berlin
+
+  # Unattended ops sidecar: periodically archives the shared ./data volume to a
+  # timestamped tar under the existing /archive mount. Stock image, no build, no
+  # host port, no application code — a pure deployment-topology concern.
+  aido-backup:
+    image: offen/docker-volume-backup:latest
+    container_name: aido-backup
+    restart: unless-stopped
+    volumes:
+      - ./data:/backup/data:ro                        # backup source (read-only)
+      - "${HOME}/Documents/Archive:/archive:rw"       # backup target
+    environment:
+      - BACKUP_SOURCES=/backup
+      - BACKUP_ARCHIVE=/archive
+      - BACKUP_FILENAME=aido-data-%Y%m%dT%H%M%S.tar.gz
+      - BACKUP_CRON_EXPRESSION=0 2 * * *
+      - TZ=Europe/Berlin
